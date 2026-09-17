@@ -12,7 +12,7 @@ const modelView = { model: null, angleX: -0.45, angleY: 0.65, zoom: 1, panX: 0, 
 
 const copy = {
   tr: {
-    workspace: 'Çalışma alanı', home: 'Anasayfa', convert: 'Belgeler', threeDTools: '3D Tools', documentTools: 'Document Tools', stlConversion: '3D Tools', preview: 'Önizle', recentFiles: 'Son dosyalar', tools: 'Araçlar',
+    workspace: 'Çalışma alanı', home: 'Anasayfa', convert: 'Belgeler', threeDTools: '3D Tools', documentTools: 'Document Tools', previews: 'Önizlemeler', threeDPreview: '3D Preview', documentPreview: 'Document Preview', audioPreview: 'Audio Preview', imagePreview: 'Image Preview', preview: 'Önizle', recentFiles: 'Son dosyalar', tools: 'Araçlar',
     imageTools: 'Görsel araçları', audioTools: 'Ses araçları', soon: 'Yakında', howItWorks: 'Nasıl çalışır?',
     privacy: 'Dosyaların cihazında<br />kalır.', ready: 'Hazır', headline: 'Dosyanı dönüştür.',
     subheadline: 'Dosyanı bırak, formatını seç, devamını Forge halletsin.', quickAction: 'Hızlı işlem',
@@ -35,7 +35,7 @@ const copy = {
     exportImage: 'Görseli dışa aktar', exportAudio: 'WAV olarak dışa aktar', audioReady: 'Ses dosyası hazır',
   },
   en: {
-    workspace: 'Workspace', home: 'Home', convert: 'Documents', threeDTools: '3D Tools', documentTools: 'Document Tools', stlConversion: '3D Tools', preview: 'Preview', recentFiles: 'Recent files', tools: 'Tools',
+    workspace: 'Workspace', home: 'Home', convert: 'Documents', threeDTools: '3D Tools', documentTools: 'Document Tools', previews: 'Previews', threeDPreview: '3D Preview', documentPreview: 'Document Preview', audioPreview: 'Audio Preview', imagePreview: 'Image Preview', preview: 'Preview', recentFiles: 'Recent files', tools: 'Tools',
     imageTools: 'Image tools', audioTools: 'Audio tools', soon: 'Soon', howItWorks: 'How it works',
     privacy: 'Your files stay<br />on your device.', ready: 'Ready', headline: 'Convert your file.',
     subheadline: 'Drop a file, choose a format, and let Forge handle the rest.', quickAction: 'Quick action',
@@ -111,6 +111,11 @@ function showMainView(view, showModeTabs = view !== 'home') {
   document.querySelector('.conversion-layout').classList.toggle('hidden', home);
   document.querySelector('.preview-section').classList.toggle('hidden', home);
   document.querySelector('.recent-section').classList.toggle('hidden', home);
+  document.querySelector('.output-panel').classList.remove('hidden');
+  document.querySelector('.connector').classList.remove('hidden');
+  document.querySelector('.preview-card').classList.remove('hidden');
+  $('#documentPreview').classList.add('hidden');
+  document.body.dataset.previewType = '';
 }
 
 function resetFile() {
@@ -119,6 +124,7 @@ function resetFile() {
   $('#viewportStatus').textContent = t('emptyScene');
   modelView.model = null;
   drawModel();
+  $('#documentPreview').classList.add('hidden'); $('#documentPreviewText').textContent = '';
 }
 function handleFile(file) {
   if (!file) return;
@@ -126,9 +132,13 @@ function handleFile(file) {
   const extension = (file.name.split('.').pop() || 'file').toUpperCase();
   state.file = file; $('#fileType').textContent = extension; $('#fileName').textContent = file.name;
   $('#fileMeta').textContent = `${formatSize(file.size)} · ${t('uploaded')}`; fileRow.classList.remove('hidden'); dropzone.classList.add('hidden');
-  convertButton.disabled = false; $('.empty-preview').classList.add('hidden'); $('#loadedModel').classList.remove('hidden');
+  convertButton.disabled = false;
+  if (state.mode === '3d') { $('.empty-preview').classList.add('hidden'); $('#loadedModel').classList.remove('hidden'); }
   $('#modelLabel').textContent = file.name; $('#viewportStatus').textContent = `${extension} · ${t('ready')}`;
   if (state.mode === '3d') previewModel(file).catch((error) => showToast(error.message));
+  if (state.mode === 'doc' && document.body.dataset.previewType === 'document') {
+    textFromFile(file).then((text) => { $('#documentPreviewText').textContent = text; $('#documentPreview').classList.remove('hidden'); }).catch((error) => showToast(error.message));
+  }
 }
 function addRecent(item) {
   state.recent.unshift(item); const list = $('#recentList'); $('#recentEmpty')?.remove();
@@ -291,15 +301,16 @@ function audioToWav(buffer) {
   let offset = 44; for (let i = 0; i < buffer.length; i += 1) for (let channel = 0; channel < channels; channel += 1) { const sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[i])); view.setInt16(offset, sample < 0 ? sample * 32768 : sample * 32767, true); offset += 2; }
   return new Blob([output], { type: 'audio/wav' });
 }
-function openUtility(type) {
+function openUtility(type, previewOnly = false) {
   const panel = $('#utilityPanel');
   document.querySelector('.mode-tabs').classList.add('hidden');
   document.querySelector('.conversion-layout').classList.add('hidden');
   document.querySelector('.preview-section').classList.add('hidden');
   document.querySelector('.recent-section').classList.add('hidden');
-  panel.classList.remove('hidden'); panel.innerHTML = utilityMarkup(type);
+  panel.classList.remove('hidden'); panel.innerHTML = previewOnly ? `<h2>${t(type === 'image' ? 'imagePreview' : 'audioPreview')}</h2><p>${t(type === 'image' ? 'imageDescription' : 'audioDescription')}</p><input id="utilityFile" type="file" accept="${type === 'image' ? 'image/*' : 'audio/*'}"><div class="utility-meta" id="utilityMeta"></div><div id="mediaPreview"></div>` : utilityMarkup(type);
   const input = $('#utilityFile'); const action = $('#utilityAction'); let file;
   input.addEventListener('change', () => { file = input.files[0]; $('#utilityMeta').textContent = file ? `${file.name} · ${formatSize(file.size)}` : ''; });
+  if (previewOnly) { input.addEventListener('change', () => { const preview = $('#mediaPreview'); preview.innerHTML = type === 'image' ? `<img class="media-preview-image" src="${URL.createObjectURL(file)}" alt="">` : `<audio controls src="${URL.createObjectURL(file)}"></audio>`; }); return; }
   action.addEventListener('click', async () => {
     if (!file) return showToast(state.lang === 'tr' ? 'Önce bir dosya seç.' : 'Choose a file first.');
     try {
@@ -347,13 +358,15 @@ convertButton.addEventListener('click', async () => {
 document.querySelectorAll('.mode-tab').forEach((tab) => tab.addEventListener('click', () => setMode(tab.dataset.mode)));
 document.querySelectorAll('.nav-item[data-view]').forEach((item) => item.addEventListener('click', () => {
   document.querySelectorAll('.nav-item[data-view]').forEach((nav) => nav.classList.remove('active')); item.classList.add('active');
-  const key = item.dataset.view === 'home' ? 'home' : item.dataset.view === '3d-tools' ? 'threeDTools' : item.dataset.view === 'documents' ? 'documentTools' : item.dataset.view === 'preview' ? 'preview' : item.dataset.view === 'recent' ? 'recentFiles' : null;
+  const key = item.dataset.view === 'home' ? 'home' : item.dataset.view === '3d-tools' ? 'threeDTools' : item.dataset.view === 'documents' ? 'documentTools' : item.dataset.view === '3d-preview' ? 'threeDPreview' : item.dataset.view === 'document-preview' ? 'documentPreview' : item.dataset.view === 'audio-preview' ? 'audioPreview' : item.dataset.view === 'image-preview' ? 'imagePreview' : item.dataset.view === 'recent' ? 'recentFiles' : null;
   $('#breadcrumbCurrent').textContent = key ? t(key) : item.querySelector('span:not(.nav-badge):not(.tool-dot):not(.soon)')?.textContent;
   if (item.dataset.view === 'home') showMainView('home');
   else if (item.dataset.view === 'image' || item.dataset.view === 'audio') { showMainView('utility'); openUtility(item.dataset.view); }
   else if (item.dataset.view === '3d-tools') { showMainView('workspace', false); setMode('3d'); }
   else if (item.dataset.view === 'documents') { showMainView('workspace', false); setMode('doc'); }
-  else if (item.dataset.view === 'preview') { showMainView('workspace'); setMode('3d', true); }
+  else if (item.dataset.view === '3d-preview') { document.body.dataset.previewType = '3d'; showMainView('workspace', false); setMode('3d', true); document.querySelector('.conversion-layout').classList.remove('hidden'); document.querySelector('.output-panel').classList.add('hidden'); document.querySelector('.connector').classList.add('hidden'); }
+  else if (item.dataset.view === 'document-preview') { document.body.dataset.previewType = 'document'; showMainView('workspace', false); setMode('doc', true); document.querySelector('.conversion-layout').classList.remove('hidden'); document.querySelector('.output-panel').classList.add('hidden'); document.querySelector('.connector').classList.add('hidden'); document.querySelector('.preview-section').classList.remove('hidden'); document.querySelector('.preview-card').classList.add('hidden'); document.querySelector('.document-preview').classList.remove('hidden'); }
+  else if (item.dataset.view === 'audio-preview' || item.dataset.view === 'image-preview') { showMainView('utility'); openUtility(item.dataset.view.replace('-preview', ''), true); }
   else if (item.dataset.view !== 'convert') showToast(t('upcoming', $('#breadcrumbCurrent').textContent));
 }));
 document.querySelectorAll('[data-home-action]').forEach((button) => button.addEventListener('click', () => {

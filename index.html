@@ -28,10 +28,11 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 10 8-6 8 6v9H4z"/><path d="M9 19v-5h6v5"/></svg>
             <span data-i18n="home">Home</span>
           </button>
-          <button class="nav-item" data-view="preview">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 4 7 4v8l-7 4-7-4V8l7-4Z"/><path d="m5 8 7 4 7-4M12 12v8"/></svg>
-            <span data-i18n="preview">Preview</span>
-          </button>
+          <p class="sidebar-label" data-i18n="previews">Previews</p>
+          <button class="nav-item" data-view="3d-preview"><span class="tool-dot dot-purple"></span><span data-i18n="threeDPreview">3D Preview</span></button>
+          <button class="nav-item" data-view="document-preview"><span class="tool-dot dot-pink"></span><span data-i18n="documentPreview">Document Preview</span></button>
+          <button class="nav-item" data-view="audio-preview"><span class="tool-dot dot-blue"></span><span data-i18n="audioPreview">Audio Preview</span></button>
+          <button class="nav-item" data-view="image-preview"><span class="tool-dot dot-purple"></span><span data-i18n="imagePreview">Image Preview</span></button>
           <button class="nav-item" data-view="recent">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
             <span data-i18n="recentFiles">Recent files</span>
@@ -132,6 +133,7 @@
               <div class="viewport" id="viewport"><div class="viewport-grid"></div><div class="empty-preview"><div class="ghost-model"><i></i><i></i><i></i></div><strong data-i18n="previewPlaceholder">Your model preview will appear here</strong><span data-i18n="previewHint">Upload a 3D file to inspect the scene.</span></div><div class="loaded-model hidden" id="loadedModel"><canvas id="modelCanvas" aria-label="3D model preview"></canvas><div class="model-label" id="modelLabel">model.stl</div></div><div class="axis"><span class="axis-x">X</span><span class="axis-y">Y</span><span class="axis-z">Z</span></div></div>
               <div class="viewport-footer"><span data-i18n="controlsHint">Left-drag to rotate · Right-drag to pan · Scroll to zoom</span><span id="viewportStatus" data-i18n="emptyScene">Empty scene</span></div>
             </div>
+            <div class="document-preview hidden" id="documentPreview"><pre id="documentPreviewText"></pre></div>
           </section>
 
           <section class="recent-section">
