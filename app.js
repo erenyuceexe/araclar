@@ -103,11 +103,11 @@ function setMode(mode, keepFile = false) {
     : '<option value="pdf">PDF — Portable document</option><option value="docx">DOCX — Word document</option><option value="txt">TXT — Plain text</option><option value="md">MD — Markdown</option>';
   if (!keepFile) resetFile();
 }
-function showMainView(view) {
+function showMainView(view, showModeTabs = view !== 'home') {
   const home = view === 'home';
   $('#homeView').classList.toggle('hidden', !home);
   $('#utilityPanel').classList.add('hidden');
-  document.querySelector('.mode-tabs').classList.toggle('hidden', home);
+  document.querySelector('.mode-tabs').classList.toggle('hidden', !showModeTabs);
   document.querySelector('.conversion-layout').classList.toggle('hidden', home);
   document.querySelector('.preview-section').classList.toggle('hidden', home);
   document.querySelector('.recent-section').classList.toggle('hidden', home);
@@ -351,8 +351,8 @@ document.querySelectorAll('.nav-item[data-view]').forEach((item) => item.addEven
   $('#breadcrumbCurrent').textContent = key ? t(key) : item.querySelector('span:not(.nav-badge):not(.tool-dot):not(.soon)')?.textContent;
   if (item.dataset.view === 'home') showMainView('home');
   else if (item.dataset.view === 'image' || item.dataset.view === 'audio') { showMainView('utility'); openUtility(item.dataset.view); }
-  else if (item.dataset.view === '3d-tools') { showMainView('workspace'); setMode('3d'); }
-  else if (item.dataset.view === 'documents') { showMainView('workspace'); setMode('doc'); }
+  else if (item.dataset.view === '3d-tools') { showMainView('workspace', false); setMode('3d'); }
+  else if (item.dataset.view === 'documents') { showMainView('workspace', false); setMode('doc'); }
   else if (item.dataset.view === 'preview') { showMainView('workspace'); setMode('3d', true); }
   else if (item.dataset.view !== 'convert') showToast(t('upcoming', $('#breadcrumbCurrent').textContent));
 }));
