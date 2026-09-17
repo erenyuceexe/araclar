@@ -11,7 +11,7 @@ const modelView = { model: null, angleX: -0.45, angleY: 0.65, zoom: 1, panX: 0, 
 
 const copy = {
   tr: {
-    workspace: 'Çalışma alanı', convert: 'Dönüştür', preview: 'Önizle', recentFiles: 'Son dosyalar', tools: 'Araçlar',
+    workspace: 'Çalışma alanı', home: 'Anasayfa', convert: 'Belgeler', stlConversion: 'STL conversion', preview: 'Önizle', recentFiles: 'Son dosyalar', tools: 'Araçlar',
     imageTools: 'Görsel araçları', audioTools: 'Ses araçları', soon: 'Yakında', howItWorks: 'Nasıl çalışır?',
     privacy: 'Dosyaların cihazında<br />kalır.', ready: 'Hazır', headline: 'Dosyanı dönüştür.',
     subheadline: 'Dosyanı bırak, formatını seç, devamını Forge halletsin.', quickAction: 'Hızlı işlem',
@@ -26,13 +26,15 @@ const copy = {
     upcoming: (name) => `${name} görünümü yakında burada.`, resetDone: 'Sahne görünümü sıfırlandı.',
     cleared: 'Son işlemler temizlendi.', help: 'Dosyanı yükle, hedef formatı seç ve dönüştürmeye başla.',
     converting: 'Dönüştürülüyor…', conversionError: 'Dönüştürme başarısız oldu: ',
+    homeKicker: 'DOSYALAR İÇİN ÜRETİM ALANI', homeHeadline: 'Fikrini <em>dosyaya</em><br />dönüştür.', homeDescription: '3D modelleri, belgeleri, görselleri ve sesleri tek bir sakin çalışma alanında hazırla.',
+    startStl: "STL conversion'a başla ↘", exploreTools: 'Araçları keşfet', homeStep1: 'Modelini yükle', homeStep2: 'Formatını seç', homeStep3: 'Çıktını al',
     imageTitle: 'Görsel araçları', imageDescription: 'Görseli yeniden boyutlandır veya tarayıcıda başka bir formata aktar.',
     audioTitle: 'Ses araçları', audioDescription: 'Ses dosyasını WAV olarak dışa aktar ve temel teknik bilgisini gör.',
     chooseImage: 'Görsel seç', chooseAudio: 'Ses seç', width: 'Genişlik', imageFormat: 'Çıktı formatı',
     exportImage: 'Görseli dışa aktar', exportAudio: 'WAV olarak dışa aktar', audioReady: 'Ses dosyası hazır',
   },
   en: {
-    workspace: 'Workspace', convert: 'Convert', preview: 'Preview', recentFiles: 'Recent files', tools: 'Tools',
+    workspace: 'Workspace', home: 'Home', convert: 'Documents', stlConversion: 'STL conversion', preview: 'Preview', recentFiles: 'Recent files', tools: 'Tools',
     imageTools: 'Image tools', audioTools: 'Audio tools', soon: 'Soon', howItWorks: 'How it works',
     privacy: 'Your files stay<br />on your device.', ready: 'Ready', headline: 'Convert your file.',
     subheadline: 'Drop a file, choose a format, and let Forge handle the rest.', quickAction: 'Quick action',
@@ -46,6 +48,8 @@ const copy = {
     converted: (name) => `${name} is ready — download started.`, tooLarge: 'This file is larger than the 100 MB limit.',
     upcoming: (name) => `${name} view is coming soon.`, resetDone: 'Scene view reset.', cleared: 'Recent activity cleared.',
     help: 'Upload a file, choose the target format, and start the conversion.', converting: 'Converting…', conversionError: 'Conversion failed: ',
+    homeKicker: 'A PRODUCTION SPACE FOR FILES', homeHeadline: 'Turn ideas into <em>files.</em>', homeDescription: 'Prepare 3D models, documents, images, and audio in one calm workspace.',
+    startStl: 'Start STL conversion ↘', exploreTools: 'Explore tools', homeStep1: 'Upload your model', homeStep2: 'Choose a format', homeStep3: 'Take your output',
     imageTitle: 'Image tools', imageDescription: 'Resize an image or export it to another format in your browser.',
     audioTitle: 'Audio tools', audioDescription: 'Export an audio file as WAV and inspect basic technical metadata.',
     chooseImage: 'Choose image', chooseAudio: 'Choose audio', width: 'Width', imageFormat: 'Output format',
@@ -88,6 +92,15 @@ function setMode(mode, keepFile = false) {
     ? `<option value="obj">OBJ — ${state.lang === 'tr' ? '3D model' : '3D model'}</option><option value="stl">STL — ${state.lang === 'tr' ? '3D baskı' : '3D print'}</option>`
     : '<option value="pdf">PDF — Portable document</option><option value="docx">DOCX — Word document</option><option value="txt">TXT — Plain text</option><option value="md">MD — Markdown</option>';
   if (!keepFile) resetFile();
+}
+function showMainView(view) {
+  const home = view === 'home';
+  $('#homeView').classList.toggle('hidden', !home);
+  $('#utilityPanel').classList.add('hidden');
+  document.querySelector('.mode-tabs').classList.toggle('hidden', home);
+  document.querySelector('.conversion-layout').classList.toggle('hidden', home);
+  document.querySelector('.preview-section').classList.toggle('hidden', home);
+  document.querySelector('.recent-section').classList.toggle('hidden', home);
 }
 
 function resetFile() {
@@ -296,38 +309,6 @@ async function convertFile() {
     const content = target === 'obj' ? modelToObj(model) : modelToStl(model);
     return { blob: new Blob([content], { type: 'text/plain' }), name: `${base}.${target}` };
   }
-  function utilityMarkup(type) {
-    const image = type === 'image';
-    return `<h2>${t(image ? 'imageTitle' : 'audioTitle')}</h2><p>${t(image ? 'imageDescription' : 'audioDescription')}</p><div class="utility-grid"><label class="utility-control">${t(image ? 'chooseImage' : 'chooseAudio')}<input id="utilityFile" type="file" accept="${image ? 'image/*' : 'audio/*'}"></label>${image ? `<label class="utility-control">${t('width')}<input id="imageWidth" type="number" value="1600" min="1" max="8000"></label><label class="utility-control">${t('imageFormat')}<select id="imageFormat"><option value="image/png">PNG</option><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option></select></label><button class="utility-action" id="utilityAction">${t('exportImage')}</button>` : `<button class="utility-action" id="utilityAction">${t('exportAudio')}</button>`}</div><p class="utility-meta" id="utilityMeta"></p>`;
-  }
-  function openUtility(type) {
-    const panel = $('#utilityPanel');
-    document.querySelector('.mode-tabs').classList.add('hidden');
-    document.querySelector('.conversion-layout').classList.add('hidden');
-    document.querySelector('.preview-section').classList.add('hidden');
-    document.querySelector('.recent-section').classList.add('hidden');
-    panel.classList.remove('hidden'); panel.innerHTML = utilityMarkup(type);
-    const input = $('#utilityFile'); const action = $('#utilityAction'); let file;
-    input.addEventListener('change', () => { file = input.files[0]; $('#utilityMeta').textContent = file ? `${file.name} · ${formatSize(file.size)}` : ''; });
-    action.addEventListener('click', async () => {
-      if (!file) return showToast(state.lang === 'tr' ? 'Önce bir dosya seç.' : 'Choose a file first.');
-      try {
-        if (type === 'image') {
-          const image = await createImageBitmap(file); const width = Math.min(Number($('#imageWidth').value) || image.width, 8000); const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = Math.round(image.height * width / image.width); canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
-          const format = $('#imageFormat').value; const blob = await new Promise((resolve) => canvas.toBlob(resolve, format, .92)); download(await blob.arrayBuffer(), `${file.name.replace(/\.[^.]+$/, '')}.${format.split('/')[1]}`, format); showToast(t('converted', file.name));
-        } else {
-          const context = new AudioContext(); const buffer = await context.decodeAudioData(await file.arrayBuffer()); const wav = audioToWav(buffer); download(wav, `${file.name.replace(/\.[^.]+$/, '')}.wav`, 'audio/wav'); $('#utilityMeta').textContent = `${t('audioReady')} · ${buffer.numberOfChannels} ch · ${Math.round(buffer.duration)} s`; await context.close();
-        }
-      } catch (error) { showToast(t('conversionError') + error.message); }
-    });
-  }
-  function audioToWav(buffer) {
-    const channels = buffer.numberOfChannels; const length = buffer.length * channels * 2 + 44; const output = new ArrayBuffer(length); const view = new DataView(output);
-    const write = (offset, value) => { for (let i = 0; i < value.length; i += 1) view.setUint8(offset + i, value.charCodeAt(i)); };
-    write(0, 'RIFF'); view.setUint32(4, length - 8, true); write(8, 'WAVE'); write(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, channels, true); view.setUint32(24, buffer.sampleRate, true); view.setUint32(28, buffer.sampleRate * channels * 2, true); view.setUint16(32, channels * 2, true); view.setUint16(34, 16, true); write(36, 'data'); view.setUint32(40, length - 44, true);
-    let offset = 44; for (let i = 0; i < buffer.length; i += 1) for (let channel = 0; channel < channels; channel += 1) { const sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[i])); view.setInt16(offset, sample < 0 ? sample * 32768 : sample * 32767, true); offset += 2; }
-    return new Blob([output], { type: 'audio/wav' });
-  }
   const text = await textFromFile(state.file);
   if (target === 'docx') return { blob: await makeDocx(text), name: `${base}.docx` };
   if (target === 'pdf') return { blob: await makePdf(text), name: `${base}.pdf` };
@@ -356,11 +337,17 @@ convertButton.addEventListener('click', async () => {
 document.querySelectorAll('.mode-tab').forEach((tab) => tab.addEventListener('click', () => setMode(tab.dataset.mode)));
 document.querySelectorAll('.nav-item[data-view]').forEach((item) => item.addEventListener('click', () => {
   document.querySelectorAll('.nav-item[data-view]').forEach((nav) => nav.classList.remove('active')); item.classList.add('active');
-  const key = item.dataset.view === 'preview' ? 'preview' : item.dataset.view === 'recent' ? 'recentFiles' : null;
+  const key = item.dataset.view === 'home' ? 'home' : item.dataset.view === 'stl' ? 'stlConversion' : item.dataset.view === 'preview' ? 'preview' : item.dataset.view === 'recent' ? 'recentFiles' : item.dataset.view === 'convert' ? 'convert' : null;
   $('#breadcrumbCurrent').textContent = key ? t(key) : item.querySelector('span:not(.nav-badge):not(.tool-dot):not(.soon)')?.textContent;
-  if (item.dataset.view === 'image' || item.dataset.view === 'audio') openUtility(item.dataset.view);
-  else if (item.dataset.view === 'convert') { $('#utilityPanel').classList.add('hidden'); document.querySelector('.mode-tabs').classList.remove('hidden'); document.querySelector('.conversion-layout').classList.remove('hidden'); document.querySelector('.preview-section').classList.remove('hidden'); document.querySelector('.recent-section').classList.remove('hidden'); }
+  if (item.dataset.view === 'home') showMainView('home');
+  else if (item.dataset.view === 'image' || item.dataset.view === 'audio') { showMainView('utility'); openUtility(item.dataset.view); }
+  else if (item.dataset.view === 'stl') { showMainView('workspace'); setMode('3d'); }
+  else if (item.dataset.view === 'convert') { showMainView('workspace'); setMode('doc'); }
+  else if (item.dataset.view === 'preview') { showMainView('workspace'); setMode('3d', true); }
   else if (item.dataset.view !== 'convert') showToast(t('upcoming', $('#breadcrumbCurrent').textContent));
+}));
+document.querySelectorAll('[data-home-action]').forEach((button) => button.addEventListener('click', () => {
+  const target = button.dataset.homeAction; document.querySelector(`.nav-item[data-view="${target}"]`).click();
 }));
 document.querySelectorAll('.view-pill').forEach((pill) => pill.addEventListener('click', () => { document.querySelectorAll('.view-pill').forEach((item) => item.classList.remove('active')); pill.classList.add('active'); $('#viewport').classList.toggle('wire-mode', pill.dataset.viewmode === 'wire'); }));
 document.querySelectorAll('.view-pill').forEach((pill) => pill.addEventListener('click', () => setWireframe(pill.dataset.viewmode === 'wire')));
@@ -381,3 +368,4 @@ $('#clearRecent').addEventListener('click', () => { state.recent = []; $('#recen
 $('#helpButton').addEventListener('click', () => showToast(t('help')));
 $('#languageButton').addEventListener('click', () => { state.lang = state.lang === 'tr' ? 'en' : 'tr'; localStorage.setItem('forge-language', state.lang); applyLanguage(); });
 applyLanguage();
+showMainView('home');
