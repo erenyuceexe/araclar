@@ -187,7 +187,9 @@ function setWireframe(enabled) {
 }
 async function docxText(file) {
   const zip = await JSZip.loadAsync(await file.arrayBuffer()); const xml = await zip.file('word/document.xml').async('text');
-  return new DOMParser().parseFromString(xml, 'application/xml').documentElement.textContent.replace(/\s+/g, ' ').trim();
+  const document = new DOMParser().parseFromString(xml, 'application/xml');
+  const paragraphs = [...document.getElementsByTagNameNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'p')];
+  return paragraphs.map((paragraph) => paragraph.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n');
 }
 async function pdfText(file) {
   const pdfjs = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs');
