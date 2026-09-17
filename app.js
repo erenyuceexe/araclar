@@ -1,4 +1,5 @@
 const state = { mode: '3d', file: null, recent: [], target: 'OBJ', lang: localStorage.getItem('forge-language') || (navigator.language?.toLowerCase().startsWith('tr') ? 'tr' : 'en') };
+const theme = localStorage.getItem('forge-theme') || (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
 const $ = (selector) => document.querySelector(selector);
 const dropzone = $('#dropzone');
 const fileInput = $('#fileInput');
@@ -67,6 +68,14 @@ function applyLanguage() {
   $('#dropTitle').textContent = state.mode === '3d' ? t('drop3d') : t('dropDoc');
   $('#fileMeta').textContent = state.file ? `${formatSize(state.file.size)} · ${t('uploaded')}` : '';
   setMode(state.mode, true);
+  applyTheme();
+}
+function applyTheme() {
+  document.documentElement.classList.toggle('theme-dark', theme === 'dark');
+  const button = $('#themeButton');
+  button.textContent = theme === 'dark' ? '☼' : '◐';
+  button.title = theme === 'dark' ? (state.lang === 'tr' ? 'Açık moda geç' : 'Switch to light mode') : (state.lang === 'tr' ? 'Karanlık moda geç' : 'Switch to dark mode');
+  button.setAttribute('aria-label', button.title);
 }
 
 function showToast(message) {
@@ -367,5 +376,12 @@ $('#resetPreview').addEventListener('click', () => { modelView.angleX = -0.45; m
 $('#clearRecent').addEventListener('click', () => { state.recent = []; $('#recentList').innerHTML = `<div class="recent-empty" id="recentEmpty"><span>✦</span><span>${t('noActivity')}</span></div>`; showToast(t('cleared')); });
 $('#helpButton').addEventListener('click', () => showToast(t('help')));
 $('#languageButton').addEventListener('click', () => { state.lang = state.lang === 'tr' ? 'en' : 'tr'; localStorage.setItem('forge-language', state.lang); applyLanguage(); });
+$('#themeButton').addEventListener('click', () => {
+  const next = document.documentElement.classList.contains('theme-dark') ? 'light' : 'dark';
+  localStorage.setItem('forge-theme', next);
+  document.documentElement.classList.toggle('theme-dark', next === 'dark');
+  const button = $('#themeButton'); button.textContent = next === 'dark' ? '☼' : '◐'; button.title = next === 'dark' ? (state.lang === 'tr' ? 'Açık moda geç' : 'Switch to light mode') : (state.lang === 'tr' ? 'Karanlık moda geç' : 'Switch to dark mode'); button.setAttribute('aria-label', button.title);
+});
 applyLanguage();
+applyTheme();
 showMainView('home');
