@@ -11,7 +11,7 @@ const modelView = { model: null, angleX: -0.45, angleY: 0.65, zoom: 1, panX: 0, 
 
 const copy = {
   tr: {
-    workspace: 'Çalışma alanı', convert: 'Dönüştür', preview: 'Önizle', recentFiles: 'Son dosyalar', tools: 'Araçlar',
+    workspace: 'Çalışma alanı', home: 'Anasayfa', convert: 'Belgeler', stlConversion: 'STL conversion', preview: 'Önizle', recentFiles: 'Son dosyalar', tools: 'Araçlar',
     imageTools: 'Görsel araçları', audioTools: 'Ses araçları', soon: 'Yakında', howItWorks: 'Nasıl çalışır?',
     privacy: 'Dosyaların cihazında<br />kalır.', ready: 'Hazır', headline: 'Dosyanı dönüştür.',
     subheadline: 'Dosyanı bırak, formatını seç, devamını Forge halletsin.', quickAction: 'Hızlı işlem',
@@ -26,13 +26,15 @@ const copy = {
     upcoming: (name) => `${name} görünümü yakında burada.`, resetDone: 'Sahne görünümü sıfırlandı.',
     cleared: 'Son işlemler temizlendi.', help: 'Dosyanı yükle, hedef formatı seç ve dönüştürmeye başla.',
     converting: 'Dönüştürülüyor…', conversionError: 'Dönüştürme başarısız oldu: ',
+    homeKicker: 'DOSYALAR İÇİN ÜRETİM ALANI', homeHeadline: 'Fikrini <em>dosyaya</em><br />dönüştür.', homeDescription: '3D modelleri, belgeleri, görselleri ve sesleri tek bir sakin çalışma alanında hazırla.',
+    startStl: "STL conversion'a başla ↘", exploreTools: 'Araçları keşfet', homeStep1: 'Modelini yükle', homeStep2: 'Formatını seç', homeStep3: 'Çıktını al',
     imageTitle: 'Görsel araçları', imageDescription: 'Görseli yeniden boyutlandır veya tarayıcıda başka bir formata aktar.',
     audioTitle: 'Ses araçları', audioDescription: 'Ses dosyasını WAV olarak dışa aktar ve temel teknik bilgisini gör.',
     chooseImage: 'Görsel seç', chooseAudio: 'Ses seç', width: 'Genişlik', imageFormat: 'Çıktı formatı',
     exportImage: 'Görseli dışa aktar', exportAudio: 'WAV olarak dışa aktar', audioReady: 'Ses dosyası hazır',
   },
   en: {
-    workspace: 'Workspace', convert: 'Convert', preview: 'Preview', recentFiles: 'Recent files', tools: 'Tools',
+    workspace: 'Workspace', home: 'Home', convert: 'Documents', stlConversion: 'STL conversion', preview: 'Preview', recentFiles: 'Recent files', tools: 'Tools',
     imageTools: 'Image tools', audioTools: 'Audio tools', soon: 'Soon', howItWorks: 'How it works',
     privacy: 'Your files stay<br />on your device.', ready: 'Ready', headline: 'Convert your file.',
     subheadline: 'Drop a file, choose a format, and let Forge handle the rest.', quickAction: 'Quick action',
@@ -46,6 +48,8 @@ const copy = {
     converted: (name) => `${name} is ready — download started.`, tooLarge: 'This file is larger than the 100 MB limit.',
     upcoming: (name) => `${name} view is coming soon.`, resetDone: 'Scene view reset.', cleared: 'Recent activity cleared.',
     help: 'Upload a file, choose the target format, and start the conversion.', converting: 'Converting…', conversionError: 'Conversion failed: ',
+    homeKicker: 'A PRODUCTION SPACE FOR FILES', homeHeadline: 'Turn ideas into <em>files.</em>', homeDescription: 'Prepare 3D models, documents, images, and audio in one calm workspace.',
+    startStl: 'Start STL conversion ↘', exploreTools: 'Explore tools', homeStep1: 'Upload your model', homeStep2: 'Choose a format', homeStep3: 'Take your output',
     imageTitle: 'Image tools', imageDescription: 'Resize an image or export it to another format in your browser.',
     audioTitle: 'Audio tools', audioDescription: 'Export an audio file as WAV and inspect basic technical metadata.',
     chooseImage: 'Choose image', chooseAudio: 'Choose audio', width: 'Width', imageFormat: 'Output format',
@@ -88,6 +92,15 @@ function setMode(mode, keepFile = false) {
     ? `<option value="obj">OBJ — ${state.lang === 'tr' ? '3D model' : '3D model'}</option><option value="stl">STL — ${state.lang === 'tr' ? '3D baskı' : '3D print'}</option>`
     : '<option value="pdf">PDF — Portable document</option><option value="docx">DOCX — Word document</option><option value="txt">TXT — Plain text</option><option value="md">MD — Markdown</option>';
   if (!keepFile) resetFile();
+}
+function showMainView(view) {
+  const home = view === 'home';
+  $('#homeView').classList.toggle('hidden', !home);
+  $('#utilityPanel').classList.add('hidden');
+  document.querySelector('.mode-tabs').classList.toggle('hidden', home);
+  document.querySelector('.conversion-layout').classList.toggle('hidden', home);
+  document.querySelector('.preview-section').classList.toggle('hidden', home);
+  document.querySelector('.recent-section').classList.toggle('hidden', home);
 }
 
 function resetFile() {
@@ -324,11 +337,17 @@ convertButton.addEventListener('click', async () => {
 document.querySelectorAll('.mode-tab').forEach((tab) => tab.addEventListener('click', () => setMode(tab.dataset.mode)));
 document.querySelectorAll('.nav-item[data-view]').forEach((item) => item.addEventListener('click', () => {
   document.querySelectorAll('.nav-item[data-view]').forEach((nav) => nav.classList.remove('active')); item.classList.add('active');
-  const key = item.dataset.view === 'preview' ? 'preview' : item.dataset.view === 'recent' ? 'recentFiles' : null;
+  const key = item.dataset.view === 'home' ? 'home' : item.dataset.view === 'stl' ? 'stlConversion' : item.dataset.view === 'preview' ? 'preview' : item.dataset.view === 'recent' ? 'recentFiles' : item.dataset.view === 'convert' ? 'convert' : null;
   $('#breadcrumbCurrent').textContent = key ? t(key) : item.querySelector('span:not(.nav-badge):not(.tool-dot):not(.soon)')?.textContent;
-  if (item.dataset.view === 'image' || item.dataset.view === 'audio') openUtility(item.dataset.view);
-  else if (item.dataset.view === 'convert') { $('#utilityPanel').classList.add('hidden'); document.querySelector('.mode-tabs').classList.remove('hidden'); document.querySelector('.conversion-layout').classList.remove('hidden'); document.querySelector('.preview-section').classList.remove('hidden'); document.querySelector('.recent-section').classList.remove('hidden'); }
+  if (item.dataset.view === 'home') showMainView('home');
+  else if (item.dataset.view === 'image' || item.dataset.view === 'audio') { showMainView('utility'); openUtility(item.dataset.view); }
+  else if (item.dataset.view === 'stl') { showMainView('workspace'); setMode('3d'); }
+  else if (item.dataset.view === 'convert') { showMainView('workspace'); setMode('doc'); }
+  else if (item.dataset.view === 'preview') { showMainView('workspace'); setMode('3d', true); }
   else if (item.dataset.view !== 'convert') showToast(t('upcoming', $('#breadcrumbCurrent').textContent));
+}));
+document.querySelectorAll('[data-home-action]').forEach((button) => button.addEventListener('click', () => {
+  const target = button.dataset.homeAction; document.querySelector(`.nav-item[data-view="${target}"]`).click();
 }));
 document.querySelectorAll('.view-pill').forEach((pill) => pill.addEventListener('click', () => { document.querySelectorAll('.view-pill').forEach((item) => item.classList.remove('active')); pill.classList.add('active'); $('#viewport').classList.toggle('wire-mode', pill.dataset.viewmode === 'wire'); }));
 document.querySelectorAll('.view-pill').forEach((pill) => pill.addEventListener('click', () => setWireframe(pill.dataset.viewmode === 'wire')));
@@ -349,3 +368,4 @@ $('#clearRecent').addEventListener('click', () => { state.recent = []; $('#recen
 $('#helpButton').addEventListener('click', () => showToast(t('help')));
 $('#languageButton').addEventListener('click', () => { state.lang = state.lang === 'tr' ? 'en' : 'tr'; localStorage.setItem('forge-language', state.lang); applyLanguage(); });
 applyLanguage();
+showMainView('home');
