@@ -139,17 +139,32 @@ function parsePly(text) {
   return { vertices, faces };
 }
 function parseStl(buffer) {
-  const bytes = new Uint8Array(buffer); const text = new TextDecoder().decode(bytes);
-  if (/^\s*solid\b/i.test(text) && text.includes('facet')) {
-    const vertices = [], faces = []; const lines = text.split(/\r?\n/);
-    lines.forEach((line) => { const m = line.trim().match(/^vertex\s+([-\d.e+]+)\s+([-\d.e+]+)\s+([-\d.e+]+)/i); if (m) vertices.push(m.slice(1).map(Number)); });
-    for (let i = 0; i < vertices.length; i += 3) faces.push([i, i + 1, i + 2]);
-    return { vertices, faces };
+  if (!(buffer instanceof ArrayBuffer) || buffer.byteLength < 15) throw new Error(state.lang === 'tr' ? 'STL dosyası çok kısa veya bozuk.' : 'The STL file is too short or corrupted.');
+  const bytes = new Uint8Array(buffer);
+  const text = new TextDecoder().decode(bytes);
+  const asciiVertices = [];
+  const vertexPattern = /^\s*vertex\s+([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\s+([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\s+([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)/gim;
+  let match;
+  while ((match = vertexPattern.exec(text)) !== null) asciiVertices.push(match.slice(1).map(Number));
+  if (asciiVertices.length >= 3 && asciiVertices.length % 3 === 0) {
+    const faces = [];
+    for (let i = 0; i < asciiVertices.length; i += 3) faces.push([i, i + 1, i + 2]);
+    return { vertices: asciiVertices, faces };
   }
-  const count = new DataView(buffer).getUint32(80, true); const vertices = [], faces = []; let offset = 84;
-  for (let i = 0; i < count && offset + 50 <= buffer.byteLength; i += 1) {
-    const start = vertices.length; for (let j = 0; j < 3; j += 1) { offset += 12; vertices.push([new DataView(buffer).getFloat32(offset - 12, true), new DataView(buffer).getFloat32(offset - 8, true), new DataView(buffer).getFloat32(offset - 4, true)]); }
-    faces.push([start, start + 1, start + 2]); offset += 14;
+  if (buffer.byteLength < 84) throw new Error(state.lang === 'tr' ? 'Geçersiz STL başlığı.' : 'Invalid STL header.');
+  const view = new DataView(buffer);
+  const count = view.getUint32(80, true);
+  const expectedLength = 84 + count * 50;
+  if (!count || expectedLength > buffer.byteLength) throw new Error(state.lang === 'tr' ? 'STL üçgen verisi okunamadı.' : 'STL triangle data could not be read.');
+  const vertices = [], faces = [];
+  for (let triangle = 0; triangle < count; triangle += 1) {
+    const offset = 84 + triangle * 50;
+    const start = vertices.length;
+    for (let vertex = 0; vertex < 3; vertex += 1) {
+      const vertexOffset = offset + 12 + vertex * 12;
+      vertices.push([view.getFloat32(vertexOffset, true), view.getFloat32(vertexOffset + 4, true), view.getFloat32(vertexOffset + 8, true)]);
+    }
+    faces.push([start, start + 1, start + 2]);
   }
   return { vertices, faces };
 }
