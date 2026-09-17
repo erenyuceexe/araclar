@@ -7,6 +7,11 @@ const convertButton = $('#convertButton');
 const formatSelect = $('#formatSelect');
 const fileRow = $('#fileRow');
 const toast = $('#toast');
+let modelRenderer;
+let modelScene;
+let modelCamera;
+let modelControls;
+let modelMesh;
 
 const copy = {
   tr: {
@@ -94,6 +99,7 @@ function handleFile(file) {
   $('#fileMeta').textContent = `${formatSize(file.size)} · ${t('uploaded')}`; fileRow.classList.remove('hidden'); dropzone.classList.add('hidden');
   convertButton.disabled = false; $('.empty-preview').classList.add('hidden'); $('#loadedModel').classList.remove('hidden');
   $('#modelLabel').textContent = file.name; $('#viewportStatus').textContent = `${extension} · ${t('ready')}`;
+  if (state.mode === '3d') previewModel(file).catch((error) => showToast(error.message));
 }
 function addRecent(item) {
   state.recent.unshift(item); const list = $('#recentList'); $('#recentEmpty')?.remove();
@@ -137,6 +143,47 @@ function modelToStl(model) {
   const lines = ['solid forge'];
   model.faces.forEach((face) => { lines.push(' facet normal 0 0 0', '  outer loop', ...face.map((i) => `   vertex ${model.vertices[i].join(' ')}`), '  endloop', ' endfacet'); });
   lines.push('endsolid forge'); return lines.join('\n');
+}
+async function previewModel(file) {
+  if (!window.THREE) throw new Error('3D preview engine is unavailable.');
+  const ext = file.name.split('.').pop().toLowerCase();
+  const model = ext === 'obj' ? parseObj(await file.text()) : parseStl(await file.arrayBuffer());
+  if (!model.vertices.length || !model.faces.length) throw new Error(state.lang === 'tr' ? 'Model geometrisi bulunamadı.' : 'No model geometry found.');
+  const canvas = $('#modelCanvas');
+  if (!modelRenderer) {
+    modelRenderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    modelRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    modelScene = new THREE.Scene();
+    modelScene.add(new THREE.HemisphereLight(0xffffff, 0x171b22, 2));
+    const light = new THREE.DirectionalLight(0xf4b84a, 2.5); light.position.set(3, 5, 4); modelScene.add(light);
+    modelCamera = new THREE.PerspectiveCamera(42, 1, 0.01, 1000); modelCamera.position.set(2.5, 2, 3.5);
+    modelControls = window.THREE.OrbitControls ? new THREE.OrbitControls(modelCamera, canvas) : null;
+    if (modelControls) { modelControls.enableDamping = true; modelControls.dampingFactor = 0.08; }
+  }
+  if (modelMesh) { modelMesh.geometry.dispose(); modelMesh.material.dispose(); modelScene.remove(modelMesh); }
+  const positions = new Float32Array(model.faces.flatMap((face) => face.flatMap((index) => model.vertices[index])));
+  const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3)); geometry.computeVertexNormals();
+  const material = new THREE.MeshStandardMaterial({ color: 0xf4b84a, metalness: 0.18, roughness: 0.48, side: THREE.DoubleSide });
+  modelMesh = new THREE.Mesh(geometry, material); modelScene.add(modelMesh);
+  geometry.computeBoundingSphere(); const radius = geometry.boundingSphere.radius || 1;
+  modelMesh.scale.setScalar(1.65 / radius); modelMesh.position.sub(geometry.boundingSphere.center.multiplyScalar(modelMesh.scale.x));
+  if (modelControls) modelControls.target.set(0, 0, 0);
+  resizeModelCanvas();
+  animateModel();
+}
+function resizeModelCanvas() {
+  if (!modelRenderer || !modelCamera) return;
+  const canvas = $('#modelCanvas'); const width = canvas.clientWidth || 500; const height = canvas.clientHeight || 280;
+  modelRenderer.setSize(width, height, false); modelCamera.aspect = width / height; modelCamera.updateProjectionMatrix();
+}
+function animateModel() {
+  if (!modelRenderer) return;
+  requestAnimationFrame(animateModel);
+  if (modelControls) modelControls.update();
+  modelRenderer.render(modelScene, modelCamera);
+}
+function setWireframe(enabled) {
+  if (modelMesh?.material) modelMesh.material.wireframe = enabled;
 }
 async function docxText(file) {
   const zip = await JSZip.loadAsync(await file.arrayBuffer()); const xml = await zip.file('word/document.xml').async('text');
@@ -205,7 +252,9 @@ document.querySelectorAll('.nav-item[data-view]').forEach((item) => item.addEven
   if (item.dataset.view !== 'convert') showToast(t('upcoming', $('#breadcrumbCurrent').textContent));
 }));
 document.querySelectorAll('.view-pill').forEach((pill) => pill.addEventListener('click', () => { document.querySelectorAll('.view-pill').forEach((item) => item.classList.remove('active')); pill.classList.add('active'); $('#viewport').classList.toggle('wire-mode', pill.dataset.viewmode === 'wire'); }));
-$('#resetPreview').addEventListener('click', () => showToast(t('resetDone')));
+document.querySelectorAll('.view-pill').forEach((pill) => pill.addEventListener('click', () => setWireframe(pill.dataset.viewmode === 'wire')));
+window.addEventListener('resize', resizeModelCanvas);
+$('#resetPreview').addEventListener('click', () => { if (modelControls) { modelControls.reset(); } showToast(t('resetDone')); });
 $('#clearRecent').addEventListener('click', () => { state.recent = []; $('#recentList').innerHTML = `<div class="recent-empty" id="recentEmpty"><span>✦</span><span>${t('noActivity')}</span></div>`; showToast(t('cleared')); });
 $('#helpButton').addEventListener('click', () => showToast(t('help')));
 $('#languageButton').addEventListener('click', () => { state.lang = state.lang === 'tr' ? 'en' : 'tr'; localStorage.setItem('forge-language', state.lang); applyLanguage(); });
