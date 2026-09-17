@@ -28,15 +28,6 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 10 8-6 8 6v9H4z"/><path d="M9 19v-5h6v5"/></svg>
             <span data-i18n="home">Home</span>
           </button>
-          <button class="nav-item" data-view="convert">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10M7 7l3-3M7 7l3 3M17 17H7m10 0-3-3m3 3-3 3"/></svg>
-            <span data-i18n="convert">Convert</span>
-            <span class="nav-badge">1</span>
-          </button>
-          <button class="nav-item" data-view="stl">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/></svg>
-            <span data-i18n="stlConversion">STL conversion</span>
-          </button>
           <button class="nav-item" data-view="preview">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 4 7 4v8l-7 4-7-4V8l7-4Z"/><path d="m5 8 7 4 7-4M12 12v8"/></svg>
             <span data-i18n="preview">Preview</span>
@@ -49,6 +40,8 @@
 
         <div class="sidebar-group tools-group">
           <p class="sidebar-label" data-i18n="tools">Tools</p>
+          <button class="nav-item muted" data-view="3d-tools"><span class="tool-dot dot-purple"></span><span data-i18n="threeDTools">3D Tools</span></button>
+          <button class="nav-item muted" data-view="documents"><span class="tool-dot dot-pink"></span><span data-i18n="documentTools">Document Tools</span></button>
           <button class="nav-item muted" data-view="image"><span class="tool-dot dot-purple"></span><span data-i18n="imageTools">Image tools</span></button>
           <button class="nav-item muted" data-view="audio"><span class="tool-dot dot-blue"></span><span data-i18n="audioTools">Audio tools</span></button>
         </div>
@@ -74,7 +67,7 @@
             <div class="home-kicker"><span class="home-rule"></span><span data-i18n="homeKicker">DOSYALAR İÇİN ÜRETİM ALANI</span></div>
             <h1 data-i18n="homeHeadline">Fikrini <em>dosyaya</em><br />dönüştür.</h1>
             <p data-i18n="homeDescription">3D modelleri, belgeleri, görselleri ve sesleri tek bir sakin çalışma alanında hazırla.</p>
-            <div class="home-actions"><button class="home-primary" data-home-action="stl" data-i18n="startStl">STL conversion'a başla ↘</button><button class="home-secondary" data-home-action="convert" data-i18n="exploreTools">Araçları keşfet</button></div>
+            <div class="home-actions"><button class="home-primary" data-home-action="3d-tools" data-i18n="startStl">3D Tools'a başla ↘</button><button class="home-secondary" data-home-action="documents" data-i18n="exploreTools">Araçları keşfet</button></div>
             <div class="home-steps"><div><strong>01</strong><span data-i18n="homeStep1">Modelini yükle</span></div><div><strong>02</strong><span data-i18n="homeStep2">Formatını seç</span></div><div><strong>03</strong><span data-i18n="homeStep3">Çıktını al</span></div></div>
           </section>
           <section class="intro">
