@@ -88,7 +88,7 @@
             <div class="source-panel panel">
               <div class="panel-heading">
                 <div><span class="step-number">01</span><h2 data-i18n="addFile">Add file</h2></div>
-                <span class="format-hint" id="formatHint">STL · OBJ · GLB · PLY</span>
+                <span class="format-hint" id="formatHint">STL · OBJ · PLY · OFF</span>
               </div>
               <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Dosya seçmek için tıklayın veya sürükleyin">
                 <input type="file" id="fileInput" hidden />
@@ -115,10 +115,14 @@
                 <select id="formatSelect" aria-label="Çıktı formatı">
                   <option value="obj">OBJ — 3D model</option>
                   <option value="stl">STL — 3D baskı</option>
-                  <option value="glb">GLB — Web modeli</option>
                   <option value="ply">PLY — Nokta bulutu</option>
                 </select>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
+              </div>
+              <div class="mesh-options" id="meshOptions">
+                <div class="mesh-option-heading"><label for="simplifyRange" data-i18n="simplifyMesh">Simplify mesh</label><output id="simplifyValue">100%</output></div>
+                <input id="simplifyRange" type="range" min="10" max="100" step="5" value="100" aria-describedby="simplifyHint" />
+                <div class="mesh-option-meta"><span id="meshStats" data-i18n="meshStats">Original geometry</span><span data-i18n="simplifyHint">Reduces triangles for a lighter export</span></div>
               </div>
               <button class="convert-button" id="convertButton" disabled><span data-i18n="startConversion">Start conversion</span><svg viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6"/></svg></button>
               <p class="output-note"><span class="mini-lock">⌁</span> <span data-i18n="localProcessing">Processing happens in your browser</span></p>
