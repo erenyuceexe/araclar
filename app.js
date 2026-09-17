@@ -257,6 +257,38 @@ async function makePdf(text) {
   const pdf = new window.jspdf.jsPDF(); const lines = pdf.splitTextToSize(text || ' ', 175);
   lines.forEach((line, index) => { if (index && index % 42 === 0) pdf.addPage(); pdf.text(line, 18, 20 + (index % 42) * 6); }); return pdf.output('blob');
 }
+function utilityMarkup(type) {
+  const image = type === 'image';
+  return `<h2>${t(image ? 'imageTitle' : 'audioTitle')}</h2><p>${t(image ? 'imageDescription' : 'audioDescription')}</p><div class="utility-grid"><label class="utility-control">${t(image ? 'chooseImage' : 'chooseAudio')}<input id="utilityFile" type="file" accept="${image ? 'image/*' : 'audio/*'}"></label>${image ? `<label class="utility-control">${t('width')}<input id="imageWidth" type="number" value="1600" min="1" max="8000"></label><label class="utility-control">${t('imageFormat')}<select id="imageFormat"><option value="image/png">PNG</option><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option></select></label><button class="utility-action" id="utilityAction">${t('exportImage')}</button>` : `<button class="utility-action" id="utilityAction">${t('exportAudio')}</button>`}</div><p class="utility-meta" id="utilityMeta"></p>`;
+}
+function audioToWav(buffer) {
+  const channels = buffer.numberOfChannels; const length = buffer.length * channels * 2 + 44; const output = new ArrayBuffer(length); const view = new DataView(output);
+  const write = (offset, value) => { for (let i = 0; i < value.length; i += 1) view.setUint8(offset + i, value.charCodeAt(i)); };
+  write(0, 'RIFF'); view.setUint32(4, length - 8, true); write(8, 'WAVE'); write(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, channels, true); view.setUint32(24, buffer.sampleRate, true); view.setUint32(28, buffer.sampleRate * channels * 2, true); view.setUint16(32, channels * 2, true); view.setUint16(34, 16, true); write(36, 'data'); view.setUint32(40, length - 44, true);
+  let offset = 44; for (let i = 0; i < buffer.length; i += 1) for (let channel = 0; channel < channels; channel += 1) { const sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[i])); view.setInt16(offset, sample < 0 ? sample * 32768 : sample * 32767, true); offset += 2; }
+  return new Blob([output], { type: 'audio/wav' });
+}
+function openUtility(type) {
+  const panel = $('#utilityPanel');
+  document.querySelector('.mode-tabs').classList.add('hidden');
+  document.querySelector('.conversion-layout').classList.add('hidden');
+  document.querySelector('.preview-section').classList.add('hidden');
+  document.querySelector('.recent-section').classList.add('hidden');
+  panel.classList.remove('hidden'); panel.innerHTML = utilityMarkup(type);
+  const input = $('#utilityFile'); const action = $('#utilityAction'); let file;
+  input.addEventListener('change', () => { file = input.files[0]; $('#utilityMeta').textContent = file ? `${file.name} · ${formatSize(file.size)}` : ''; });
+  action.addEventListener('click', async () => {
+    if (!file) return showToast(state.lang === 'tr' ? 'Önce bir dosya seç.' : 'Choose a file first.');
+    try {
+      if (type === 'image') {
+        const image = await createImageBitmap(file); const width = Math.min(Number($('#imageWidth').value) || image.width, 8000); const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = Math.round(image.height * width / image.width); canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+        const format = $('#imageFormat').value; const blob = await new Promise((resolve) => canvas.toBlob(resolve, format, .92)); download(await blob.arrayBuffer(), `${file.name.replace(/\.[^.]+$/, '')}.${format.split('/')[1]}`, format); showToast(t('converted', file.name));
+      } else {
+        const context = new AudioContext(); const buffer = await context.decodeAudioData(await file.arrayBuffer()); const wav = audioToWav(buffer); download(wav, `${file.name.replace(/\.[^.]+$/, '')}.wav`, 'audio/wav'); $('#utilityMeta').textContent = `${t('audioReady')} · ${buffer.numberOfChannels} ch · ${Math.round(buffer.duration)} s`; await context.close();
+      }
+    } catch (error) { showToast(t('conversionError') + error.message); }
+  });
+}
 async function convertFile() {
   const ext = state.file.name.split('.').pop().toLowerCase(); const target = formatSelect.value; const base = state.file.name.replace(/\.[^.]+$/, '');
   if (state.mode === '3d') {
