@@ -48,7 +48,7 @@ button:focus-visible, select:focus-visible, [tabindex]:focus-visible { outline: 
 .tools-group { margin-top: 3px; }
 .nav-item.muted { color: #bda8be; }
 .tool-dot { width: 7px; height: 7px; border-radius: 50%; margin: 0 5px; opacity: .8; }
-.dot-purple { background: #9b82e6; }.dot-blue { background: #61a4df; }
+.dot-purple { background: #9b82e6; }.dot-pink { background: var(--fuchsia); }.dot-blue { background: #61a4df; }
 .soon { margin-left: auto; color: #58616c; font: 10px 'DM Mono', monospace; }
 .sidebar-footer { margin-top: auto; }
 .help-link { border: 0; background: none; color: #dbcada; padding: 10px 12px; display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; }
