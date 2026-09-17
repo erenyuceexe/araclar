@@ -1,4 +1,4 @@
-const state = { mode: '3d', file: null, recent: [], target: 'OBJ', lang: localStorage.getItem('forge-language') || (navigator.language?.toLowerCase().startsWith('tr') ? 'tr' : 'en') };
+const state = { mode: '3d', file: null, geometry: null, recent: [], target: 'OBJ', simplifyRatio: 1, lang: localStorage.getItem('forge-language') || (navigator.language?.toLowerCase().startsWith('tr') ? 'tr' : 'en') };
 const theme = localStorage.getItem('forge-theme') || (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
 const $ = (selector) => document.querySelector(selector);
 const dropzone = $('#dropzone');
@@ -19,6 +19,7 @@ const copy = {
     threeDFiles: '3D dosyaları', documents: 'Belgeler', addFile: 'Dosya ekle', orBrowse: 'veya cihazından seç',
     chooseFile: 'Dosya seç', maxSize: 'Maksimum dosya boyutu: 100 MB', outputFormat: 'Çıktı formatı',
     startConversion: 'Dönüştürmeyi başlat', localProcessing: 'İşlem tarayıcında gerçekleşir', resetScene: 'Sahneyi sıfırla',
+    simplifyMesh: 'Mesh’i sadeleştir', simplifyHint: 'Daha hafif çıktı için üçgenleri azaltır', meshStats: 'Orijinal geometri',
     solid: 'Katı', wireframe: 'Tel kafes', previewPlaceholder: 'Model önizlemesi burada görünecek',
     previewHint: 'Bir 3D dosyası yüklediğinde sahneyi inceleyebilirsin.', controlsHint: 'Sol tıkla döndür · Sağ tıkla kaydır · Tekerlekle yakınlaştır',
     emptyScene: 'Boş sahne', recentActivity: 'Son işlemler', thisSession: 'Bu oturum', clear: 'Temizle', noActivity: 'Henüz bir işlem yok',
@@ -42,6 +43,7 @@ const copy = {
     threeDFiles: '3D files', documents: 'Documents', addFile: 'Add file', orBrowse: 'or browse your device',
     chooseFile: 'Choose file', maxSize: 'Maximum file size: 100 MB', outputFormat: 'Output format',
     startConversion: 'Start conversion', localProcessing: 'Processing happens in your browser', resetScene: 'Reset scene',
+    simplifyMesh: 'Simplify mesh', simplifyHint: 'Reduce triangles for a lighter export', meshStats: 'Original geometry',
     solid: 'Solid', wireframe: 'Wireframe', previewPlaceholder: 'Your model preview will appear here',
     previewHint: 'Upload a 3D file to inspect the scene.', controlsHint: 'Left-drag to rotate · Right-drag to pan · Scroll to zoom',
     emptyScene: 'Empty scene', recentActivity: 'Recent activity', thisSession: 'This session', clear: 'Clear', noActivity: 'No activity yet',
@@ -67,6 +69,7 @@ function applyLanguage() {
   $('#languageButton').title = state.lang === 'tr' ? 'İngilizceye geç' : 'Switch to Turkish';
   $('#dropTitle').textContent = state.mode === '3d' ? t('drop3d') : t('dropDoc');
   $('#fileMeta').textContent = state.file ? `${formatSize(state.file.size)} · ${t('uploaded')}` : '';
+  updateSimplifyUi();
   setMode(state.mode, true);
   applyTheme();
 }
@@ -95,11 +98,12 @@ function setMode(mode, keepFile = false) {
   });
   const is3d = mode === '3d';
   document.querySelector('.preview-section').classList.toggle('hidden', !is3d);
-  $('#formatHint').textContent = is3d ? 'STL · OBJ' : 'PDF · DOCX · TXT · MD';
+  $('#meshOptions').classList.toggle('hidden', !is3d);
+  $('#formatHint').textContent = is3d ? 'STL · OBJ · PLY · OFF' : 'PDF · DOCX · TXT · MD';
   $('#dropTitle').textContent = is3d ? t('drop3d') : t('dropDoc');
-  fileInput.accept = is3d ? '.stl,.obj' : '.pdf,.docx,.txt,.md';
+  fileInput.accept = is3d ? '.stl,.obj,.ply,.off' : '.pdf,.docx,.txt,.md';
   formatSelect.innerHTML = is3d
-    ? `<option value="obj">OBJ — ${state.lang === 'tr' ? '3D model' : '3D model'}</option><option value="stl">STL — ${state.lang === 'tr' ? '3D baskı' : '3D print'}</option>`
+    ? `<option value="obj">OBJ — 3D model</option><option value="stl">STL — ${state.lang === 'tr' ? '3D baskı' : '3D print'}</option><option value="ply">PLY — ${state.lang === 'tr' ? 'Mesh verisi' : 'Mesh data'}</option><option value="off">OFF — ${state.lang === 'tr' ? 'Poligon mesh' : 'Polygon mesh'}</option>`
     : '<option value="pdf">PDF — Portable document</option><option value="docx">DOCX — Word document</option><option value="txt">TXT — Plain text</option><option value="md">MD — Markdown</option>';
   if (!keepFile) resetFile();
 }
@@ -119,10 +123,12 @@ function showMainView(view, showModeTabs = view !== 'home') {
 }
 
 function resetFile() {
-  state.file = null; fileInput.value = ''; fileRow.classList.add('hidden'); dropzone.classList.remove('hidden');
+  state.file = null; state.geometry = null; state.simplifyRatio = 1; fileInput.value = ''; fileRow.classList.add('hidden'); dropzone.classList.remove('hidden');
   convertButton.disabled = true; $('.empty-preview').classList.remove('hidden'); $('#loadedModel').classList.add('hidden');
   $('#viewportStatus').textContent = t('emptyScene');
   modelView.model = null;
+  $('#simplifyRange').value = 100;
+  updateSimplifyUi();
   drawModel();
   $('#documentPreview').classList.add('hidden'); $('#documentPreviewText').textContent = '';
 }
@@ -179,6 +185,19 @@ function parsePly(text) {
   });
   return { vertices, faces };
 }
+function parseOff(text) {
+  const lines = text.split(/\r?\n/).map((line) => line.replace(/#.*/, '').trim()).filter(Boolean);
+  if (lines.shift()?.toUpperCase() !== 'OFF') throw new Error(state.lang === 'tr' ? 'Geçersiz OFF başlığı.' : 'Invalid OFF header.');
+  const counts = (lines.shift() || '').split(/\s+/).map(Number);
+  if (counts.length < 2 || !Number.isFinite(counts[0]) || !Number.isFinite(counts[1])) throw new Error(state.lang === 'tr' ? 'OFF sayacı okunamadı.' : 'OFF counts could not be read.');
+  const vertices = lines.slice(0, counts[0]).map((line) => line.split(/\s+/).slice(0, 3).map(Number));
+  const faces = lines.slice(counts[0], counts[0] + counts[1]).flatMap((line) => {
+    const values = line.split(/\s+/).map(Number); const indexes = values.slice(1); const triangles = [];
+    for (let i = 1; i < indexes.length - 1; i += 1) triangles.push([indexes[0], indexes[i], indexes[i + 1]]);
+    return triangles;
+  });
+  return { vertices, faces };
+}
 function parseStl(buffer) {
   if (!(buffer instanceof ArrayBuffer) || buffer.byteLength < 15) throw new Error(state.lang === 'tr' ? 'STL dosyası çok kısa veya bozuk.' : 'The STL file is too short or corrupted.');
   const bytes = new Uint8Array(buffer);
@@ -217,15 +236,48 @@ function modelToStl(model) {
   model.faces.forEach((face) => { lines.push(' facet normal 0 0 0', '  outer loop', ...face.map((i) => `   vertex ${model.vertices[i].join(' ')}`), '  endloop', ' endfacet'); });
   lines.push('endsolid forge'); return lines.join('\n');
 }
+function modelToPly(model) {
+  return `ply\nformat ascii 1.0\ncomment Converted by Forge\nelement vertex ${model.vertices.length}\nproperty float x\nproperty float y\nproperty float z\nelement face ${model.faces.length}\nproperty list uchar int vertex_indices\nend_header\n${model.vertices.map((v) => v.join(' ')).join('\n')}\n${model.faces.map((f) => `3 ${f.join(' ')}`).join('\n')}\n`;
+}
+function modelToOff(model) {
+  return `OFF\n${model.vertices.length} ${model.faces.length} 0\n${model.vertices.map((v) => v.join(' ')).join('\n')}\n${model.faces.map((f) => `3 ${f.join(' ')}`).join('\n')}\n`;
+}
+function simplifyModel(model, ratio) {
+  if (!model || ratio >= 0.999 || model.faces.length < 4) return model;
+  const targetFaces = Math.max(1, Math.round(model.faces.length * ratio));
+  const stride = model.faces.length / targetFaces;
+  const faces = []; const used = new Set();
+  for (let i = 0; i < targetFaces; i += 1) {
+    const face = model.faces[Math.min(model.faces.length - 1, Math.floor(i * stride))];
+    if (!face || face.some((index) => !Number.isInteger(index) || !model.vertices[index])) continue;
+    faces.push(face); face.forEach((index) => used.add(index));
+  }
+  const remap = new Map(); const vertices = [];
+  used.forEach((index) => { remap.set(index, vertices.length); vertices.push(model.vertices[index]); });
+  return { vertices, faces: faces.map((face) => face.map((index) => remap.get(index))) };
+}
+function updateSimplifyUi() {
+  const range = $('#simplifyRange'); if (!range) return;
+  const percent = Math.round(state.simplifyRatio * 100); $('#simplifyValue').value = `${percent}%`; $('#simplifyValue').textContent = `${percent}%`;
+  const model = state.geometry;
+  $('#meshStats').textContent = model ? `${model.vertices.length.toLocaleString()} ${state.lang === 'tr' ? 'nokta' : 'vertices'} · ${model.faces.length.toLocaleString()} ${state.lang === 'tr' ? 'üçgen' : 'triangles'}` : t('meshStats');
+}
+function applySimplification() {
+  if (!state.geometry) return;
+  const simplified = simplifyModel(state.geometry, state.simplifyRatio);
+  const center = simplified.vertices.reduce((sum, vertex) => sum.map((value, index) => value + vertex[index]), [0, 0, 0]).map((value) => value / simplified.vertices.length);
+  const bounds = simplified.vertices.reduce((result, vertex) => ({ min: result.min.map((value, i) => Math.min(value, vertex[i])), max: result.max.map((value, i) => Math.max(value, vertex[i])) }), { min: [...simplified.vertices[0]], max: [...simplified.vertices[0]] });
+  const span = Math.max(...bounds.max.map((value, i) => value - bounds.min[i]), 0.001);
+  modelView.model = { vertices: simplified.vertices.map((vertex) => vertex.map((value, i) => (value - center[i]) / span)), faces: simplified.faces };
+  $('#viewportStatus').textContent = `${simplified.faces.length.toLocaleString()} ${state.lang === 'tr' ? 'üçgen' : 'triangles'} · ${t('ready')}`;
+  updateSimplifyUi(); queueDraw();
+}
 async function previewModel(file) {
   const ext = file.name.split('.').pop().toLowerCase();
-  const model = ext === 'obj' ? parseObj(await file.text()) : ext === 'ply' ? parsePly(await file.text()) : parseStl(await file.arrayBuffer());
+  const model = ext === 'obj' ? parseObj(await file.text()) : ext === 'ply' ? parsePly(await file.text()) : ext === 'off' ? parseOff(await file.text()) : parseStl(await file.arrayBuffer());
   if (!model.vertices.length || !model.faces.length) throw new Error(state.lang === 'tr' ? 'Model geometrisi bulunamadı.' : 'No model geometry found.');
-  const center = model.vertices.reduce((sum, vertex) => sum.map((value, index) => value + vertex[index]), [0, 0, 0]).map((value) => value / model.vertices.length);
-  const bounds = model.vertices.reduce((result, vertex) => ({ min: result.min.map((value, i) => Math.min(value, vertex[i])), max: result.max.map((value, i) => Math.max(value, vertex[i])) }), { min: [...model.vertices[0]], max: [...model.vertices[0]] });
-  const span = Math.max(...bounds.max.map((value, i) => value - bounds.min[i]), 0.001);
-  const faces = model.faces.length > 18000 ? model.faces.filter((_, index) => index % Math.ceil(model.faces.length / 18000) === 0) : model.faces;
-  modelView.model = { vertices: model.vertices.map((vertex) => vertex.map((value, i) => (value - center[i]) / span)), faces };
+  state.geometry = model; state.simplifyRatio = Number($('#simplifyRange').value || 100) / 100;
+  applySimplification();
   modelView.angleX = -0.45; modelView.angleY = 0.65; modelView.zoom = 1; modelView.panX = 0; modelView.panY = 0;
   queueDraw();
 }
@@ -326,9 +378,10 @@ function openUtility(type, previewOnly = false) {
 async function convertFile() {
   const ext = state.file.name.split('.').pop().toLowerCase(); const target = formatSelect.value; const base = state.file.name.replace(/\.[^.]+$/, '');
   if (state.mode === '3d') {
-    const model = ext === 'obj' ? parseObj(await state.file.text()) : parseStl(await state.file.arrayBuffer());
-    const content = target === 'obj' ? modelToObj(model) : modelToStl(model);
-    return { blob: new Blob([content], { type: 'text/plain' }), name: `${base}.${target}` };
+    const source = state.geometry || (ext === 'obj' ? parseObj(await state.file.text()) : ext === 'ply' ? parsePly(await state.file.text()) : ext === 'off' ? parseOff(await state.file.text()) : parseStl(await state.file.arrayBuffer()));
+    const model = simplifyModel(source, state.simplifyRatio);
+    const content = target === 'obj' ? modelToObj(model) : target === 'ply' ? modelToPly(model) : target === 'off' ? modelToOff(model) : modelToStl(model);
+    return { blob: new Blob([content], { type: target === 'stl' ? 'model/stl' : 'text/plain' }), name: `${base}.${target}` };
   }
   const text = await textFromFile(state.file);
   if (target === 'docx') return { blob: await makeDocx(text), name: `${base}.docx` };
@@ -345,6 +398,11 @@ fileInput.addEventListener('change', (event) => handleFile(event.target.files[0]
 dropzone.addEventListener('drop', (event) => handleFile(event.dataTransfer.files[0]));
 $('#removeFile').addEventListener('click', resetFile);
 formatSelect.addEventListener('change', () => { state.target = formatSelect.value.toUpperCase(); });
+$('#simplifyRange').addEventListener('input', (event) => {
+  state.simplifyRatio = Number(event.target.value) / 100;
+  if (state.geometry) applySimplification();
+  else updateSimplifyUi();
+});
 convertButton.addEventListener('click', async () => {
   if (!state.file) return;
   const originalLabel = convertButton.innerHTML; convertButton.disabled = true; convertButton.innerHTML = `<span>${t('converting')}</span><span class="spinner">◌</span>`;
@@ -387,6 +445,12 @@ modelCanvas.addEventListener('contextmenu', (event) => event.preventDefault());
 modelCanvas.addEventListener('wheel', (event) => { event.preventDefault(); modelView.zoom = Math.max(0.25, Math.min(4, modelView.zoom * (event.deltaY > 0 ? 0.9 : 1.1))); queueDraw(); }, { passive: false });
 window.addEventListener('resize', resizeModelCanvas);
 $('#resetPreview').addEventListener('click', () => { modelView.angleX = -0.45; modelView.angleY = 0.65; modelView.zoom = 1; modelView.panX = 0; modelView.panY = 0; queueDraw(); showToast(t('resetDone')); });
+document.querySelector('.preview-actions button[title="Center view"]').addEventListener('click', () => { modelView.panX = 0; modelView.panY = 0; modelView.zoom = 1; queueDraw(); showToast(t('resetDone')); });
+document.querySelector('.preview-actions button[title="Fullscreen"]').addEventListener('click', () => {
+  const card = document.querySelector('.preview-card');
+  if (document.fullscreenElement) document.exitFullscreen?.();
+  else card.requestFullscreen?.();
+});
 $('#clearRecent').addEventListener('click', () => { state.recent = []; $('#recentList').innerHTML = `<div class="recent-empty" id="recentEmpty"><span>✦</span><span>${t('noActivity')}</span></div>`; showToast(t('cleared')); });
 $('#helpButton').addEventListener('click', () => showToast(t('help')));
 $('#languageButton').addEventListener('click', () => { state.lang = state.lang === 'tr' ? 'en' : 'tr'; localStorage.setItem('forge-language', state.lang); applyLanguage(); });
