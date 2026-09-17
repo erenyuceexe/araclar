@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#12161c" />
+    <title>Forge — Convert your files</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <!--
+      THESIS: Forge, dosya dönüştürmeyi sonuç ekranı değil canlı bir çalışma masası gibi hissettirir.
+      OWN-WORLD: Grafit zemin, amber işlem ışığı, ince teknik çizgiler ve geniş, sakin kontroller.
+      STORY: Kullanıcı dosyasını bırakır, modelini veya belgesini görür, hedef formatı seçer ve çıktıyı alır.
+      FIRST VIEWPORT: Sol navigasyon, üstte işlem başlığı, ortada yükleme/önizleme alanı ve sağda çıktı kuyruğu.
+      FORM: Operate odaklı bir workbench; kart yığını yerine sürekli bir yüzey ve net durum satırları.
+    -->
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+          <span>forge</span>
+        </div>
+
+        <div class="sidebar-group">
+          <p class="sidebar-label" data-i18n="workspace">Workspace</p>
+          <button class="nav-item active" data-view="convert">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10M7 7l3-3M7 7l3 3M17 17H7m10 0-3-3m3 3-3 3"/></svg>
+            <span data-i18n="convert">Convert</span>
+            <span class="nav-badge">1</span>
+          </button>
+          <button class="nav-item" data-view="preview">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 4 7 4v8l-7 4-7-4V8l7-4Z"/><path d="m5 8 7 4 7-4M12 12v8"/></svg>
+            <span data-i18n="preview">Preview</span>
+          </button>
+          <button class="nav-item" data-view="recent">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+            <span data-i18n="recentFiles">Recent files</span>
+          </button>
+        </div>
+
+        <div class="sidebar-group tools-group">
+          <p class="sidebar-label" data-i18n="tools">Tools</p>
+          <button class="nav-item muted" data-view="image"><span class="tool-dot dot-purple"></span><span data-i18n="imageTools">Image tools</span><span class="soon" data-i18n="soon">Soon</span></button>
+          <button class="nav-item muted" data-view="audio"><span class="tool-dot dot-blue"></span><span data-i18n="audioTools">Audio tools</span><span class="soon" data-i18n="soon">Soon</span></button>
+        </div>
+
+        <div class="sidebar-footer">
+          <button class="help-link" id="helpButton"><span class="help-icon">?</span> <span data-i18n="howItWorks">How it works</span></button>
+          <div class="privacy-note"><span class="lock-icon">⌁</span><span data-i18n="privacy">Your files stay<br />on your device.</span></div>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div class="breadcrumb"><span data-i18n="workspace">Workspace</span><span class="slash">/</span><strong id="breadcrumbCurrent" data-i18n="convert">Convert</strong></div>
+          <div class="topbar-actions">
+            <span class="status-dot"></span><span class="status-text" data-i18n="ready">Ready</span>
+            <button class="icon-button" title="Bildirimler" aria-label="Bildirimler"><svg viewBox="0 0 24 24"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></button>
+            <button class="language-button" id="languageButton" title="Switch language">TR</button><button class="avatar" title="Profile">A</button>
+          </div>
+        </header>
+
+        <div class="workspace">
+          <section class="intro">
+            <div>
+              <h1 data-i18n="headline">Convert your file.</h1>
+              <p data-i18n="subheadline">Drop a file, choose a format, and let Forge handle the rest.</p>
+            </div>
+            <div class="shortcut-hint"><span>⌘</span><span>K</span><em data-i18n="quickAction">Quick action</em></div>
+          </section>
+
+          <div class="mode-tabs" role="tablist" aria-label="Araç kategorisi">
+            <button class="mode-tab active" role="tab" aria-selected="true" data-mode="3d"><span class="tab-icon cube-icon">◇</span><span data-i18n="threeDFiles">3D files</span></button>
+            <button class="mode-tab" role="tab" aria-selected="false" data-mode="doc"><span class="tab-icon">▤</span><span data-i18n="documents">Documents</span></button>
+          </div>
+
+          <section class="conversion-layout">
+            <div class="source-panel panel">
+              <div class="panel-heading">
+                <div><span class="step-number">01</span><h2 data-i18n="addFile">Add file</h2></div>
+                <span class="format-hint" id="formatHint">STL · OBJ · GLB · PLY</span>
+              </div>
+              <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Dosya seçmek için tıklayın veya sürükleyin">
+                <input type="file" id="fileInput" hidden />
+                <div class="drop-art" aria-hidden="true"><div class="drop-cube"></div><div class="drop-shadow"></div></div>
+                <div class="drop-copy"><strong id="dropTitle">Drop your file here</strong><span data-i18n="orBrowse">or browse your device</span></div>
+                <button class="secondary-button" id="browseButton" data-i18n="chooseFile">Choose file</button>
+                <p class="drop-limit" data-i18n="maxSize">Maximum file size: 100 MB</p>
+              </div>
+              <div class="file-row hidden" id="fileRow">
+                <div class="file-type" id="fileType">STL</div>
+                <div class="file-details"><strong id="fileName">model.stl</strong><span id="fileMeta">2.4 MB · Uploaded</span></div>
+                <button class="remove-file" id="removeFile" aria-label="Remove file">×</button>
+              </div>
+            </div>
+
+            <div class="connector" aria-hidden="true"><span></span><svg viewBox="0 0 24 24"><path d="m5 12 14 0m-5-6 6 6-6 6"/></svg></div>
+
+            <div class="output-panel panel">
+              <div class="panel-heading">
+                <div><span class="step-number">02</span><h2 data-i18n="outputFormat">Output format</h2></div>
+                <span class="format-hint">HEDEF</span>
+              </div>
+              <div class="select-wrap">
+                <select id="formatSelect" aria-label="Çıktı formatı">
+                  <option value="obj">OBJ — 3D model</option>
+                  <option value="stl">STL — 3D baskı</option>
+                  <option value="glb">GLB — Web modeli</option>
+                  <option value="ply">PLY — Nokta bulutu</option>
+                </select>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
+              </div>
+              <button class="convert-button" id="convertButton" disabled><span data-i18n="startConversion">Start conversion</span><svg viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6"/></svg></button>
+              <p class="output-note"><span class="mini-lock">⌁</span> <span data-i18n="localProcessing">Processing happens in your browser</span></p>
+            </div>
+          </section>
+
+          <section class="preview-section">
+            <div class="section-heading"><div><span class="step-number">03</span><h2 data-i18n="preview">Preview</h2></div><button class="text-button" id="resetPreview"><span data-i18n="resetScene">Reset scene</span> <span>↻</span></button></div>
+            <div class="preview-card">
+              <div class="preview-toolbar"><div class="view-pills"><button class="view-pill active" data-viewmode="solid" data-i18n="solid">Solid</button><button class="view-pill" data-viewmode="wire" data-i18n="wireframe">Wireframe</button></div><div class="preview-actions"><button title="Center view" aria-label="Center view">⊙</button><button title="Fullscreen" aria-label="Fullscreen">⛶</button></div></div>
+              <div class="viewport" id="viewport"><div class="viewport-grid"></div><div class="empty-preview"><div class="ghost-model"><i></i><i></i><i></i></div><strong data-i18n="previewPlaceholder">Your model preview will appear here</strong><span data-i18n="previewHint">Upload a 3D file to inspect the scene.</span></div><div class="loaded-model hidden" id="loadedModel"><div class="model-orbit"><div class="model-shape"></div></div><div class="model-label" id="modelLabel">model.stl</div></div><div class="axis"><span class="axis-x">X</span><span class="axis-y">Y</span><span class="axis-z">Z</span></div></div>
+              <div class="viewport-footer"><span data-i18n="controlsHint">Left-drag to rotate · Right-drag to pan · Scroll to zoom</span><span id="viewportStatus" data-i18n="emptyScene">Empty scene</span></div>
+            </div>
+          </section>
+
+          <section class="recent-section">
+            <div class="section-heading"><div><h2 data-i18n="recentActivity">Recent activity</h2><span class="section-caption" data-i18n="thisSession">This session</span></div><button class="text-button" id="clearRecent" data-i18n="clear">Clear</button></div>
+            <div class="recent-list" id="recentList"><div class="recent-empty" id="recentEmpty"><span>✦</span><span data-i18n="noActivity">No activity yet</span></div></div>
+          </section>
+        </div>
+      </main>
+    </div>
+    <div class="toast" id="toast" role="status"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
