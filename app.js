@@ -1,4 +1,4 @@
-const state = { mode: '3d', file: null, geometry: null, recent: [], target: 'OBJ', simplifyRatio: 1, imageEditor: null, lang: localStorage.getItem('forge-language') || (navigator.language?.toLowerCase().startsWith('tr') ? 'tr' : 'en') };
+const state = { mode: '3d', file: null, geometry: null, recent: [], target: 'OBJ', simplifyRatio: 1, imageEditor: null, audioEditor: null, lang: localStorage.getItem('forge-language') || (navigator.language?.toLowerCase().startsWith('tr') ? 'tr' : 'en') };
 const theme = localStorage.getItem('forge-theme') || (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
 const $ = (selector) => document.querySelector(selector);
 const $all = (selector) => document.querySelectorAll(selector);
@@ -32,10 +32,11 @@ const copy = {
     homeKicker: 'DOSYALAR İÇİN ÜRETİM ALANI', homeHeadline: 'Fikrini <em>dosyaya</em><br />dönüştür.', homeDescription: '3D modelleri, belgeleri, görselleri ve sesleri tek bir sakin çalışma alanında hazırla.',
     startStl: "3D Tools'a başla ↘", exploreTools: 'Araçları keşfet', homeStep1: 'Modelini yükle', homeStep2: 'Formatını seç', homeStep3: 'Çıktını al',
     imageTitle: 'Görsel araçları', imageDescription: 'Görseli yeniden boyutlandır veya tarayıcıda başka bir formata aktar.',
-    audioTitle: 'Ses araçları', audioDescription: 'Ses dosyasını WAV olarak dışa aktar ve temel teknik bilgisini gör.',
+    audioTitle: 'Ses araçları', audioDescription: 'Sesini kes, yumuşak geçiş ekle ve tarayıcında WAV olarak dışa aktar.',
     chooseImage: 'Görsel seç', chooseAudio: 'Ses seç', width: 'Genişlik', height: 'Yükseklik', aspect: 'En-boy oranı',
     imageFormat: 'Çıktı formatı', rotateLeft: 'Sola çevir', rotateRight: 'Sağa çevir', flipHorizontal: 'Yatay çevir', flipVertical: 'Dikey çevir',
-    exportImage: 'Görseli dışa aktar', exportAudio: 'WAV olarak dışa aktar', audioReady: 'Ses dosyası hazır',
+    exportImage: 'Görseli dışa aktar', exportAudio: 'Seçimi WAV olarak dışa aktar', audioReady: 'Ses dosyası hazır',
+    audioFormats: 'MP3 · WAV · OGG · FLAC · M4A · AAC · WebM · Opus', audioStart: 'Başlangıç', audioEnd: 'Bitiş', audioSelection: 'Seçim', audioFadeIn: 'Fade in', audioFadeOut: 'Fade out', audioVolume: 'Ses seviyesi', audioPlay: 'Seçimi oynat', audioStop: 'Durdur', audioMeta: 'Bir ses dosyası seçerek dalga formunu gör.', audioOutput: 'Çıktı: WAV (16-bit PCM)', audioNoFile: 'Önce bir ses dosyası seç.', audioInvalidRange: 'Bitiş zamanı başlangıçtan büyük olmalı.',
     cropPreset: 'Kırp', keepOriginal: 'Orijinal', square: 'Kare', landscape: 'Manzara', portrait: 'Portre', quality: 'Kalite',
     selectImage: 'Görsel seç', readyImage: 'Görsel hazır', imageMeta: 'Seçilen görseli dönüştür ve indir.',
   },
@@ -58,10 +59,11 @@ const copy = {
     homeKicker: 'A PRODUCTION SPACE FOR FILES', homeHeadline: 'Turn ideas into <em>files.</em>', homeDescription: 'Prepare 3D models, documents, images, and audio in one calm workspace.',
     startStl: 'Start 3D Tools ↘', exploreTools: 'Explore tools', homeStep1: 'Upload your model', homeStep2: 'Choose a format', homeStep3: 'Take your output',
     imageTitle: 'Image tools', imageDescription: 'Resize an image or export it to another format in your browser.',
-    audioTitle: 'Audio tools', audioDescription: 'Export an audio file as WAV and inspect basic technical metadata.',
+    audioTitle: 'Audio tools', audioDescription: 'Trim audio, add gentle fades, and export a WAV directly in your browser.',
     chooseImage: 'Choose image', chooseAudio: 'Choose audio', width: 'Width', height: 'Height', aspect: 'Aspect ratio',
     imageFormat: 'Output format', rotateLeft: 'Rotate left', rotateRight: 'Rotate right', flipHorizontal: 'Flip horizontal', flipVertical: 'Flip vertical',
-    exportImage: 'Export image', exportAudio: 'Export as WAV', audioReady: 'Audio file ready',
+    exportImage: 'Export image', exportAudio: 'Export selection as WAV', audioReady: 'Audio file ready',
+    audioFormats: 'MP3 · WAV · OGG · FLAC · M4A · AAC · WebM · Opus', audioStart: 'Start', audioEnd: 'End', audioSelection: 'Selection', audioFadeIn: 'Fade in', audioFadeOut: 'Fade out', audioVolume: 'Volume', audioPlay: 'Play selection', audioStop: 'Stop', audioMeta: 'Choose an audio file to see its waveform.', audioOutput: 'Output: WAV (16-bit PCM)', audioNoFile: 'Choose an audio file first.', audioInvalidRange: 'End time must be greater than start time.',
     cropPreset: 'Crop', keepOriginal: 'Original', square: 'Square', landscape: 'Landscape', portrait: 'Portrait', quality: 'Quality',
     selectImage: 'Select image', readyImage: 'Image ready', imageMeta: 'Adjust, export, and download the selected image.',
   },
@@ -385,7 +387,19 @@ function utilityMarkup(type) {
       </div>
     </div>
     <p class="utility-meta" id="utilityMeta">${t('imageMeta')}</p>
-  ` : `<div class="utility-grid"><label class="utility-control">${t('chooseAudio')}<input id="utilityFile" type="file" accept="audio/*"></label><button class="utility-action" id="utilityAction">${t('exportAudio')}</button></div><p class="utility-meta" id="utilityMeta"></p>`}`;
+  ` : `<div class="audio-editor-shell">
+      <label class="utility-control audio-file-picker">${t('chooseAudio')}<input id="utilityFile" type="file" accept=".mp3,.wav,.ogg,.flac,.m4a,.aac,.webm,.opus,audio/*"><small>${t('audioFormats')}</small></label>
+      <div class="audio-waveform-wrap"><canvas id="audioWaveform" height="150" aria-label="${t('audioSelection')}"></canvas><div class="audio-empty" id="audioEmpty">${t('audioMeta')}</div></div>
+      <div class="audio-transport"><button type="button" class="image-action" id="audioPlay" disabled>▶ ${t('audioPlay')}</button><button type="button" class="image-action" id="audioStop" disabled>■ ${t('audioStop')}</button><span class="audio-time" id="audioTime">0:00 / 0:00</span></div>
+      <div class="audio-range-grid">
+        <label class="utility-control">${t('audioStart')}<input id="audioStart" type="number" min="0" step="0.01" value="0"></label>
+        <label class="utility-control">${t('audioEnd')}<input id="audioEnd" type="number" min="0" step="0.01" value="0"></label>
+        <label class="utility-control">${t('audioFadeIn')}<input id="audioFadeIn" type="number" min="0" step="0.01" value="0"></label>
+        <label class="utility-control">${t('audioFadeOut')}<input id="audioFadeOut" type="number" min="0" step="0.01" value="0"></label>
+        <label class="utility-control full-span">${t('audioVolume')} <output id="audioVolumeValue">100%</output><input id="audioVolume" type="range" min="0" max="1.5" step="0.01" value="1"></label>
+      </div>
+      <div class="audio-output-row"><span>${t('audioOutput')}</span><button class="utility-action" id="utilityAction" disabled>${t('exportAudio')}</button></div>
+    </div><p class="utility-meta" id="utilityMeta">${t('audioMeta')}</p>`}`;
 }
 function audioToWav(buffer) {
   const channels = buffer.numberOfChannels; const length = buffer.length * channels * 2 + 44; const output = new ArrayBuffer(length); const view = new DataView(output);
@@ -393,6 +407,53 @@ function audioToWav(buffer) {
   write(0, 'RIFF'); view.setUint32(4, length - 8, true); write(8, 'WAVE'); write(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, channels, true); view.setUint32(24, buffer.sampleRate, true); view.setUint32(28, buffer.sampleRate * channels * 2, true); view.setUint16(32, channels * 2, true); view.setUint16(34, 16, true); write(36, 'data'); view.setUint32(40, length - 44, true);
   let offset = 44; for (let i = 0; i < buffer.length; i += 1) for (let channel = 0; channel < channels; channel += 1) { const sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[i])); view.setInt16(offset, sample < 0 ? sample * 32768 : sample * 32767, true); offset += 2; }
   return new Blob([output], { type: 'audio/wav' });
+}
+function formatTime(seconds) {
+  const safe = Math.max(0, Number(seconds) || 0); const minutes = Math.floor(safe / 60); const remainder = Math.floor(safe % 60);
+  return `${minutes}:${String(remainder).padStart(2, '0')}`;
+}
+function drawAudioWaveform() {
+  const editor = state.audioEditor; const canvas = $('#audioWaveform');
+  if (!editor?.buffer || !canvas) return;
+  const rect = canvas.getBoundingClientRect(); const ratio = window.devicePixelRatio || 1; canvas.width = Math.max(1, Math.floor(rect.width * ratio)); canvas.height = 150 * ratio;
+  const ctx = canvas.getContext('2d'); const width = canvas.width; const height = canvas.height; const data = editor.buffer.getChannelData(0); const step = Math.ceil(data.length / width);
+  ctx.clearRect(0, 0, width, height); ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--surface-2'); ctx.fillRect(0, 0, width, height);
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--violet'); ctx.globalAlpha = .8; ctx.lineWidth = Math.max(1, ratio);
+  ctx.beginPath();
+  for (let x = 0; x < width; x += 1) { let min = 1; let max = -1; const from = x * step; const to = Math.min(data.length, from + step); for (let i = from; i < to; i += 1) { min = Math.min(min, data[i]); max = Math.max(max, data[i]); } ctx.moveTo(x, (1 + min) * height / 2); ctx.lineTo(x, (1 + max) * height / 2); }
+  ctx.stroke(); ctx.globalAlpha = 1;
+  const start = editor.start / editor.buffer.duration * width; const end = editor.end / editor.buffer.duration * width;
+  ctx.fillStyle = 'rgba(212,43,130,.16)'; ctx.fillRect(start, 0, end - start, height); ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--fuchsia'); ctx.lineWidth = 2 * ratio; ctx.beginPath(); ctx.moveTo(start, 0); ctx.lineTo(start, height); ctx.moveTo(end, 0); ctx.lineTo(end, height); ctx.stroke();
+}
+function updateAudioEditor() {
+  const editor = state.audioEditor; if (!editor?.buffer) return;
+  const duration = editor.buffer.duration; const startInput = $('#audioStart'); const endInput = $('#audioEnd');
+  editor.start = Math.max(0, Math.min(duration, Number(startInput.value) || 0)); editor.end = Math.max(editor.start + 0.01, Math.min(duration, Number(endInput.value) || duration));
+  startInput.value = editor.start.toFixed(2); endInput.value = editor.end.toFixed(2);
+  $('#audioTime').textContent = `${formatTime(editor.start)} – ${formatTime(editor.end)} / ${formatTime(duration)}`;
+  $('#audioFadeIn').max = Math.max(0, editor.end - editor.start).toFixed(2); $('#audioFadeOut').max = Math.max(0, editor.end - editor.start).toFixed(2);
+  $('#audioEmpty').classList.add('hidden'); $('#audioPlay').disabled = false; $('#audioStop').disabled = false; $('#utilityAction').disabled = false;
+  $('#utilityMeta').textContent = `${editor.file.name} · ${formatSize(editor.file.size)} · ${editor.buffer.numberOfChannels} ch · ${editor.buffer.sampleRate} Hz · ${formatTime(duration)}`;
+  drawAudioWaveform();
+}
+function stopAudioPlayback() {
+  const editor = state.audioEditor; if (!editor?.source) return;
+  editor.source.stop(); editor.source.disconnect(); editor.source = null; $('#audioStop').disabled = true;
+}
+async function playAudioSelection() {
+  const editor = state.audioEditor; if (!editor?.buffer) return showToast(t('audioNoFile'));
+  stopAudioPlayback(); const context = editor.context || new AudioContext(); editor.context = context;
+  const source = context.createBufferSource(); const gain = context.createGain(); source.buffer = editor.buffer; source.connect(gain).connect(context.destination);
+  source.start(0, editor.start, editor.end - editor.start); editor.source = source; $('#audioStop').disabled = false; source.onended = () => { if (editor.source === source) { editor.source = null; $('#audioStop').disabled = true; } };
+}
+async function exportAudioSelection(file) {
+  const editor = state.audioEditor; if (!editor?.buffer) throw new Error(t('audioNoFile'));
+  if (editor.end <= editor.start) throw new Error(t('audioInvalidRange'));
+  const duration = editor.end - editor.start; const offline = new OfflineAudioContext(editor.buffer.numberOfChannels, Math.ceil(duration * editor.buffer.sampleRate), editor.buffer.sampleRate);
+  const source = offline.createBufferSource(); const gain = offline.createGain(); source.buffer = editor.buffer; source.connect(gain).connect(offline.destination);
+  const fadeIn = Math.min(Number($('#audioFadeIn').value) || 0, duration / 2); const fadeOut = Math.min(Number($('#audioFadeOut').value) || 0, duration / 2); const volume = Number($('#audioVolume').value) || 1;
+  gain.gain.setValueAtTime(0, 0); gain.gain.linearRampToValueAtTime(volume, fadeIn); gain.gain.setValueAtTime(volume, Math.max(fadeIn, duration - fadeOut)); gain.gain.linearRampToValueAtTime(0, duration);
+  source.start(0, editor.start, duration); const rendered = await offline.startRendering(); const outputName = `${file.name.replace(/\.[^.]+$/, '')}-trimmed.wav`; return { blob: audioToWav(rendered), name: outputName };
 }
 function imageCanvasState() {
   const canvas = $('#imageEditorCanvas');
@@ -451,7 +512,7 @@ function openUtility(type, previewOnly = false) {
   document.querySelector('.conversion-layout').classList.add('hidden');
   document.querySelector('.preview-section').classList.add('hidden');
   document.querySelector('.recent-section').classList.add('hidden');
-  panel.classList.remove('hidden'); panel.innerHTML = previewOnly ? `<h2>${t(type === 'image' ? 'imagePreview' : 'audioPreview')}</h2><p>${t(type === 'image' ? 'imageDescription' : 'audioDescription')}</p><input id="utilityFile" type="file" accept="${type === 'image' ? 'image/*' : 'audio/*'}"><div class="utility-meta" id="utilityMeta"></div><div id="mediaPreview"></div>` : utilityMarkup(type);
+  panel.classList.remove('hidden'); panel.innerHTML = previewOnly ? `<h2>${t(type === 'image' ? 'imagePreview' : 'audioPreview')}</h2><p>${t(type === 'image' ? 'imageDescription' : 'audioDescription')}</p><input id="utilityFile" type="file" accept="${type === 'image' ? 'image/*' : '.mp3,.wav,.ogg,.flac,.m4a,.aac,.webm,.opus,audio/*'}"><div class="utility-meta" id="utilityMeta"></div><div id="mediaPreview"></div>` : utilityMarkup(type);
   const input = $('#utilityFile'); const action = $('#utilityAction'); let file;
   if (previewOnly) {
     input.addEventListener('change', () => {
@@ -504,15 +565,24 @@ function openUtility(type, previewOnly = false) {
     });
     return;
   }
-  action.addEventListener('click', async () => {
-    if (!file) return showToast(state.lang === 'tr' ? 'Önce bir dosya seç.' : 'Choose a file first.');
+  state.audioEditor = { file: null, buffer: null, context: null, source: null, start: 0, end: 0 };
+  input.addEventListener('change', async () => {
+    file = input.files[0]; if (!file) return;
     try {
-      if (type === 'image') {
-        const image = await createImageBitmap(file); const width = Math.min(Number($('#imageWidth').value) || image.width, 8000); const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = Math.round(image.height * width / image.width); canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
-        const format = $('#imageFormat').value; const blob = await new Promise((resolve) => canvas.toBlob(resolve, format, .92)); download(await blob.arrayBuffer(), `${file.name.replace(/\.[^.]+$/, '')}.${format.split('/')[1]}`, format); showToast(t('converted', file.name));
-      } else {
-        const context = new AudioContext(); const buffer = await context.decodeAudioData(await file.arrayBuffer()); const wav = audioToWav(buffer); download(wav, `${file.name.replace(/\.[^.]+$/, '')}.wav`, 'audio/wav'); $('#utilityMeta').textContent = `${t('audioReady')} · ${buffer.numberOfChannels} ch · ${Math.round(buffer.duration)} s`; await context.close();
-      }
+      const context = new AudioContext(); const buffer = await context.decodeAudioData(await file.arrayBuffer());
+      state.audioEditor.file = file; state.audioEditor.buffer = buffer; state.audioEditor.context = context; state.audioEditor.start = 0; state.audioEditor.end = buffer.duration;
+      $('#audioStart').value = '0'; $('#audioEnd').value = buffer.duration.toFixed(2); updateAudioEditor();
+    } catch (error) { showToast(t('conversionError') + error.message); }
+  });
+  ['audioStart', 'audioEnd'].forEach((id) => $(`#${id}`).addEventListener('input', updateAudioEditor));
+  $('#audioVolume').addEventListener('input', (event) => { $('#audioVolumeValue').textContent = `${Math.round(Number(event.target.value) * 100)}%`; });
+  $('#audioPlay').addEventListener('click', playAudioSelection);
+  $('#audioStop').addEventListener('click', stopAudioPlayback);
+  window.addEventListener('resize', drawAudioWaveform);
+  action.addEventListener('click', async () => {
+    if (!file) return showToast(t('audioNoFile'));
+    try {
+      const result = await exportAudioSelection(file); download(await result.blob.arrayBuffer(), result.name, 'audio/wav'); addRecent({ name: result.name, from: file.name.split('.').pop().toUpperCase(), to: 'WAV', size: formatSize(result.blob.size) }); showToast(t('converted', result.name));
     } catch (error) { showToast(t('conversionError') + error.message); }
   });
 }
