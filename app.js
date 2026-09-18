@@ -1,6 +1,7 @@
-const state = { mode: '3d', file: null, geometry: null, recent: [], target: 'OBJ', simplifyRatio: 1, lang: localStorage.getItem('forge-language') || (navigator.language?.toLowerCase().startsWith('tr') ? 'tr' : 'en') };
+const state = { mode: '3d', file: null, geometry: null, recent: [], target: 'OBJ', simplifyRatio: 1, imageEditor: null, lang: localStorage.getItem('forge-language') || (navigator.language?.toLowerCase().startsWith('tr') ? 'tr' : 'en') };
 const theme = localStorage.getItem('forge-theme') || (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
 const $ = (selector) => document.querySelector(selector);
+const $all = (selector) => document.querySelectorAll(selector);
 const dropzone = $('#dropzone');
 const fileInput = $('#fileInput');
 const browseButton = $('#browseButton');
@@ -32,8 +33,11 @@ const copy = {
     startStl: "3D Tools'a başla ↘", exploreTools: 'Araçları keşfet', homeStep1: 'Modelini yükle', homeStep2: 'Formatını seç', homeStep3: 'Çıktını al',
     imageTitle: 'Görsel araçları', imageDescription: 'Görseli yeniden boyutlandır veya tarayıcıda başka bir formata aktar.',
     audioTitle: 'Ses araçları', audioDescription: 'Ses dosyasını WAV olarak dışa aktar ve temel teknik bilgisini gör.',
-    chooseImage: 'Görsel seç', chooseAudio: 'Ses seç', width: 'Genişlik', imageFormat: 'Çıktı formatı',
+    chooseImage: 'Görsel seç', chooseAudio: 'Ses seç', width: 'Genişlik', height: 'Yükseklik', aspect: 'En-boy oranı',
+    imageFormat: 'Çıktı formatı', rotateLeft: 'Sola çevir', rotateRight: 'Sağa çevir', flipHorizontal: 'Yatay çevir', flipVertical: 'Dikey çevir',
     exportImage: 'Görseli dışa aktar', exportAudio: 'WAV olarak dışa aktar', audioReady: 'Ses dosyası hazır',
+    cropPreset: 'Kırp', keepOriginal: 'Orijinal', square: 'Kare', landscape: 'Manzara', portrait: 'Portre', quality: 'Kalite',
+    selectImage: 'Görsel seç', readyImage: 'Görsel hazır', imageMeta: 'Seçilen görseli dönüştür ve indir.',
   },
   en: {
     workspace: 'Workspace', home: 'Home', convert: 'Documents', threeDTools: '3D Tools', documentTools: 'Document Tools', previews: 'Previews', threeDPreview: '3D Preview', documentPreview: 'Document Preview', audioPreview: 'Audio Preview', imagePreview: 'Image Preview', preview: 'Preview', recentFiles: 'Recent files', tools: 'Tools',
@@ -55,8 +59,11 @@ const copy = {
     startStl: 'Start 3D Tools ↘', exploreTools: 'Explore tools', homeStep1: 'Upload your model', homeStep2: 'Choose a format', homeStep3: 'Take your output',
     imageTitle: 'Image tools', imageDescription: 'Resize an image or export it to another format in your browser.',
     audioTitle: 'Audio tools', audioDescription: 'Export an audio file as WAV and inspect basic technical metadata.',
-    chooseImage: 'Choose image', chooseAudio: 'Choose audio', width: 'Width', imageFormat: 'Output format',
+    chooseImage: 'Choose image', chooseAudio: 'Choose audio', width: 'Width', height: 'Height', aspect: 'Aspect ratio',
+    imageFormat: 'Output format', rotateLeft: 'Rotate left', rotateRight: 'Rotate right', flipHorizontal: 'Flip horizontal', flipVertical: 'Flip vertical',
     exportImage: 'Export image', exportAudio: 'Export as WAV', audioReady: 'Audio file ready',
+    cropPreset: 'Crop', keepOriginal: 'Original', square: 'Square', landscape: 'Landscape', portrait: 'Portrait', quality: 'Quality',
+    selectImage: 'Select image', readyImage: 'Image ready', imageMeta: 'Adjust, export, and download the selected image.',
   },
 };
 const t = (key, ...args) => typeof copy[state.lang][key] === 'function' ? copy[state.lang][key](...args) : copy[state.lang][key];
@@ -344,7 +351,41 @@ async function makePdf(text) {
 }
 function utilityMarkup(type) {
   const image = type === 'image';
-  return `<h2>${t(image ? 'imageTitle' : 'audioTitle')}</h2><p>${t(image ? 'imageDescription' : 'audioDescription')}</p><div class="utility-grid"><label class="utility-control">${t(image ? 'chooseImage' : 'chooseAudio')}<input id="utilityFile" type="file" accept="${image ? 'image/*' : 'audio/*'}"></label>${image ? `<label class="utility-control">${t('width')}<input id="imageWidth" type="number" value="1600" min="1" max="8000"></label><label class="utility-control">${t('imageFormat')}<select id="imageFormat"><option value="image/png">PNG</option><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option></select></label><button class="utility-action" id="utilityAction">${t('exportImage')}</button>` : `<button class="utility-action" id="utilityAction">${t('exportAudio')}</button>`}</div><p class="utility-meta" id="utilityMeta"></p>`;
+  return `<h2>${t(image ? 'imageTitle' : 'audioTitle')}</h2><p>${t(image ? 'imageDescription' : 'audioDescription')}</p>${image ? `
+    <div class="image-editor-shell">
+      <div class="image-editor-toolbar">
+        <div class="image-toggle-group">
+          <button type="button" class="image-action" data-image-action="rotate-left">${t('rotateLeft')}</button>
+          <button type="button" class="image-action" data-image-action="rotate-right">${t('rotateRight')}</button>
+          <button type="button" class="image-action" data-image-action="flip-horizontal">${t('flipHorizontal')}</button>
+          <button type="button" class="image-action" data-image-action="flip-vertical">${t('flipVertical')}</button>
+        </div>
+        <label class="utility-control compact">
+          <span>${t('cropPreset')}</span>
+          <select id="imageCropPreset">
+            <option value="original">${t('keepOriginal')}</option>
+            <option value="square">${t('square')}</option>
+            <option value="landscape">${t('landscape')}</option>
+            <option value="portrait">${t('portrait')}</option>
+          </select>
+        </label>
+      </div>
+      <div class="utility-grid image-grid">
+        <label class="utility-control">${t('chooseImage')}<input id="utilityFile" type="file" accept="image/*"></label>
+        <label class="utility-control">${t('width')}<input id="imageWidth" type="number" value="1600" min="1" max="8000"></label>
+        <label class="utility-control">${t('height')}<input id="imageHeight" type="number" value="1200" min="1" max="8000"></label>
+        <label class="utility-control">${t('quality')}<input id="imageQuality" type="number" value="0.92" min="0.1" max="1" step="0.01"></label>
+        <label class="utility-control full-span">${t('imageFormat')}<select id="imageFormat"><option value="image/png">PNG</option><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option></select></label>
+      </div>
+      <div class="image-preview-box">
+        <canvas id="imageEditorCanvas"></canvas>
+      </div>
+      <div class="utility-actions-row">
+        <button class="utility-action" id="utilityAction">${t('exportImage')}</button>
+      </div>
+    </div>
+    <p class="utility-meta" id="utilityMeta">${t('imageMeta')}</p>
+  ` : `<div class="utility-grid"><label class="utility-control">${t('chooseAudio')}<input id="utilityFile" type="file" accept="audio/*"></label><button class="utility-action" id="utilityAction">${t('exportAudio')}</button></div><p class="utility-meta" id="utilityMeta"></p>`}`;
 }
 function audioToWav(buffer) {
   const channels = buffer.numberOfChannels; const length = buffer.length * channels * 2 + 44; const output = new ArrayBuffer(length); const view = new DataView(output);
@@ -352,6 +393,57 @@ function audioToWav(buffer) {
   write(0, 'RIFF'); view.setUint32(4, length - 8, true); write(8, 'WAVE'); write(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, channels, true); view.setUint32(24, buffer.sampleRate, true); view.setUint32(28, buffer.sampleRate * channels * 2, true); view.setUint16(32, channels * 2, true); view.setUint16(34, 16, true); write(36, 'data'); view.setUint32(40, length - 44, true);
   let offset = 44; for (let i = 0; i < buffer.length; i += 1) for (let channel = 0; channel < channels; channel += 1) { const sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[i])); view.setInt16(offset, sample < 0 ? sample * 32768 : sample * 32767, true); offset += 2; }
   return new Blob([output], { type: 'audio/wav' });
+}
+function imageCanvasState() {
+  const canvas = $('#imageEditorCanvas');
+  if (!canvas) return null;
+  return {
+    canvas,
+    ctx: canvas.getContext('2d'),
+    image: null,
+    rotation: 0,
+    flipX: false,
+    flipY: false,
+    crop: 'original',
+    quality: 0.92,
+  };
+}
+function setImageCanvasPreset(stateRef, preset) {
+  if (!stateRef || !stateRef.image) return;
+  const { image } = stateRef;
+  const width = Number($('#imageWidth').value) || image.width;
+  const height = Number($('#imageHeight').value) || image.height;
+  const presetMap = {
+    original: { width: image.width, height: image.height },
+    square: { width: Math.max(1, Math.min(image.width, image.height)), height: Math.max(1, Math.min(image.width, image.height)) },
+    landscape: { width: Math.max(1, image.width), height: Math.max(1, Math.round(image.height * 0.75)) },
+    portrait: { width: Math.max(1, Math.round(image.width * 0.75)), height: Math.max(1, image.height) },
+  };
+  const presetSize = presetMap[preset] || presetMap.original;
+  $('#imageWidth').value = Math.min(8000, Math.max(1, presetSize.width));
+  $('#imageHeight').value = Math.min(8000, Math.max(1, presetSize.height));
+  renderImageEditor();
+}
+function renderImageEditor() {
+  const editor = imageCanvasState();
+  if (!editor || !editor.image) return;
+  const image = editor.image;
+  const width = Number($('#imageWidth').value) || image.width;
+  const height = Number($('#imageHeight').value) || image.height;
+  const canvas = editor.canvas;
+  const usedWidth = Math.min(8000, Math.max(1, width));
+  const usedHeight = Math.min(8000, Math.max(1, height));
+  canvas.width = usedWidth;
+  canvas.height = usedHeight;
+  const ctx = editor.ctx;
+  ctx.clearRect(0, 0, usedWidth, usedHeight);
+  ctx.save();
+  ctx.translate(usedWidth / 2, usedHeight / 2);
+  ctx.rotate((editor.rotation * Math.PI) / 180);
+  ctx.scale(editor.flipX ? -1 : 1, editor.flipY ? -1 : 1);
+  ctx.drawImage(image, -image.width / 2, -image.height / 2, image.width, image.height);
+  ctx.restore();
+  $('#utilityMeta').textContent = `${image.name || 'Image'} · ${usedWidth}×${usedHeight} · ${formatSize(image.size || usedWidth * usedHeight * 4)}`;
 }
 function openUtility(type, previewOnly = false) {
   const panel = $('#utilityPanel');
@@ -361,8 +453,57 @@ function openUtility(type, previewOnly = false) {
   document.querySelector('.recent-section').classList.add('hidden');
   panel.classList.remove('hidden'); panel.innerHTML = previewOnly ? `<h2>${t(type === 'image' ? 'imagePreview' : 'audioPreview')}</h2><p>${t(type === 'image' ? 'imageDescription' : 'audioDescription')}</p><input id="utilityFile" type="file" accept="${type === 'image' ? 'image/*' : 'audio/*'}"><div class="utility-meta" id="utilityMeta"></div><div id="mediaPreview"></div>` : utilityMarkup(type);
   const input = $('#utilityFile'); const action = $('#utilityAction'); let file;
-  input.addEventListener('change', () => { file = input.files[0]; $('#utilityMeta').textContent = file ? `${file.name} · ${formatSize(file.size)}` : ''; });
-  if (previewOnly) { input.addEventListener('change', () => { const preview = $('#mediaPreview'); preview.innerHTML = type === 'image' ? `<img class="media-preview-image" src="${URL.createObjectURL(file)}" alt="">` : `<audio controls src="${URL.createObjectURL(file)}"></audio>`; }); return; }
+  if (previewOnly) {
+    input.addEventListener('change', () => {
+      file = input.files[0]; $('#utilityMeta').textContent = file ? `${file.name} · ${formatSize(file.size)}` : '';
+      const preview = $('#mediaPreview');
+      preview.innerHTML = type === 'image' ? `<img class="media-preview-image" src="${URL.createObjectURL(file)}" alt="">` : `<audio controls src="${URL.createObjectURL(file)}"></audio>`;
+    });
+    return;
+  }
+  if (type === 'image') {
+    state.imageEditor = imageCanvasState();
+    input.addEventListener('change', async () => {
+      file = input.files[0];
+      if (!file) return;
+      const bitmap = await createImageBitmap(file);
+      state.imageEditor.image = bitmap;
+      state.imageEditor.image.name = file.name;
+      state.imageEditor.image.size = file.size;
+      $('#utilityMeta').textContent = `${file.name} · ${formatSize(file.size)}`;
+      $('#imageWidth').value = bitmap.width;
+      $('#imageHeight').value = bitmap.height;
+      renderImageEditor();
+    });
+    $('#imageCropPreset').addEventListener('change', (event) => setImageCanvasPreset(state.imageEditor, event.target.value));
+    $all('[data-image-action]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const editor = state.imageEditor;
+        if (!editor || !editor.image) return;
+        const actionName = button.dataset.imageAction;
+        if (actionName === 'rotate-left') editor.rotation -= 90;
+        else if (actionName === 'rotate-right') editor.rotation += 90;
+        else if (actionName === 'flip-horizontal') editor.flipX = !editor.flipX;
+        else if (actionName === 'flip-vertical') editor.flipY = !editor.flipY;
+        renderImageEditor();
+      });
+    });
+    $all('#imageWidth, #imageHeight, #imageQuality').forEach((control) => control.addEventListener('input', renderImageEditor));
+    action.addEventListener('click', async () => {
+      const editor = state.imageEditor;
+      if (!file || !editor || !editor.image) return showToast(state.lang === 'tr' ? 'Önce bir görsel seç.' : 'Choose an image first.');
+      try {
+        const canvas = editor.canvas;
+        const format = $('#imageFormat').value;
+        const quality = Number($('#imageQuality').value) || 0.92;
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, format, quality));
+        if (!blob) throw new Error(state.lang === 'tr' ? 'Görsel oluşturulamadı.' : 'Image could not be created.');
+        download(await blob.arrayBuffer(), `${file.name.replace(/\.[^.]+$/, '')}.${format.split('/')[1]}`, format);
+        showToast(t('converted', file.name));
+      } catch (error) { showToast(t('conversionError') + error.message); }
+    });
+    return;
+  }
   action.addEventListener('click', async () => {
     if (!file) return showToast(state.lang === 'tr' ? 'Önce bir dosya seç.' : 'Choose a file first.');
     try {
